@@ -21,6 +21,8 @@ model User {
   grades          Grade[]
   supportMessages SupportMessage[]
   bugReports      BugReport[]
+  chatHistories   ChatHistory[]
+  keuzelessen     UserKeuzeles[]
 }
 
 model File {
@@ -44,6 +46,7 @@ model Grade {
   maxGrade    Float    @default(10.0)
   date        DateTime @default(now())
   comment     String?
+  isStudentAdded Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   studentId   String
@@ -100,4 +103,57 @@ model SiteSettings {
   value       String   @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Chat History - saves AI conversations
+model ChatHistory {
+  id        String   @id @default(cuid())
+  subject   String?  // optional subject context
+  model     String   @default("glm-4.5-air:free")
+  messages  String   @db.Text // JSON string of messages
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Schedule (Rooster) - class schedule, admin only
+model Schedule {
+  id          String   @id @default(cuid())
+  day         String   // monday, tuesday, etc.
+  period      Int      // 1st, 2nd, 3rd period
+  subject     String
+  room        String?
+  teacher     String?
+  startTime   String   // e.g., "08:30"
+  endTime     String   // e.g., "09:20"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Keuzelessen - elective courses
+model Keuzeles {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  teacher     String?
+  maxStudents Int      @default(30)
+  day         String?  // when it takes place
+  period      String?  // time period
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  students    UserKeuzeles[]
+}
+
+// User-Keuzeles relation (users can choose keuzelessen)
+model UserKeuzeles {
+  id          String   @id @default(cuid())
+  userId      String
+  keuzelesId  String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  keuzeles    Keuzeles @relation(fields: [keuzelesId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, keuzelesId])
 }

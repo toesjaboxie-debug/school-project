@@ -13,50 +13,60 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   BookOpen, 
-  MessageSquare, 
   Upload, 
   Trash2, 
   LogOut, 
-  LogIn, 
-  UserPlus, 
   Send, 
   FileText, 
   Bot,
   Eye,
   Shield,
-  Menu,
   Calendar,
   GraduationCap,
   Users,
   MessageCircle,
   Plus,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  Edit,
   Settings,
-  Pencil,
   Bug,
-  AlertTriangle
+  Clock,
+  Edit,
+  CheckCircle,
+  X,
+  Save,
+  Sparkles,
+  History,
+  BookMarked
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 
 // Default subjects
 const DEFAULT_SUBJECTS = [
-  { id: '1', name: 'wiskunde', displayName: 'Wiskunde', icon: '📐' },
-  { id: '2', name: 'engels', displayName: 'Engels', icon: '🇬🇧' },
-  { id: '3', name: 'nederlands', displayName: 'Nederlands', icon: '🇳🇱' },
-  { id: '4', name: 'geschiedenis', displayName: 'Geschiedenis', icon: '📜' },
-  { id: '5', name: 'aardrijkskunde', displayName: 'Aardrijkskunde', icon: '🌍' },
-  { id: '6', name: 'biologie', displayName: 'Biologie', icon: '🧬' },
-  { id: '7', name: 'natuurkunde', displayName: 'Natuurkunde', icon: '⚛️' },
-  { id: '8', name: 'scheikunde', displayName: 'Scheikunde', icon: '🧪' },
-  { id: '9', name: 'frans', displayName: 'Frans', icon: '🇫🇷' },
-  { id: '10', name: 'duits', displayName: 'Duits', icon: '🇩🇪' },
-  { id: '11', name: 'economie', displayName: 'Economie', icon: '📊' },
-  { id: '12', name: 'algemeen', displayName: 'Algemeen', icon: '📚' },
+  { id: '1', name: 'wiskunde', displayName: 'Wiskunde', icon: '📐', color: '#3B82F6' },
+  { id: '2', name: 'engels', displayName: 'Engels', icon: '🇬🇧', color: '#10B981' },
+  { id: '3', name: 'nederlands', displayName: 'Nederlands', icon: '🇳🇱', color: '#F59E0B' },
+  { id: '4', name: 'geschiedenis', displayName: 'Geschiedenis', icon: '📜', color: '#8B5CF6' },
+  { id: '5', name: 'aardrijkskunde', displayName: 'Aardrijkskunde', icon: '🌍', color: '#06B6D4' },
+  { id: '6', name: 'biologie', displayName: 'Biologie', icon: '🧬', color: '#22C55E' },
+  { id: '7', name: 'natuurkunde', displayName: 'Natuurkunde', icon: '⚛️', color: '#EF4444' },
+  { id: '8', name: 'scheikunde', displayName: 'Scheikunde', icon: '🧪', color: '#F97316' },
+  { id: '9', name: 'frans', displayName: 'Frans', icon: '🇫🇷', color: '#EC4899' },
+  { id: '10', name: 'duits', displayName: 'Duits', icon: '🇩🇪', color: '#6366F1' },
+  { id: '11', name: 'economie', displayName: 'Economie', icon: '📊', color: '#14B8A6' },
+  { id: '12', name: 'algemeen', displayName: 'Algemeen', icon: '📚', color: '#6B7280' },
 ];
+
+const DAYS = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag'];
+const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+const AI_MODELS: Record<string, string> = {
+  'glm-4.5-air:free': 'GLM 4.5 Air',
+  'kimi-k2-0905:free': 'Kimi K2',
+  'minimax-m2:free': 'MiniMax M2',
+  'gpt-oss-120b:free': 'GPT OSS 120B',
+  'deepseek-r1-0528:free': 'DeepSeek R1',
+  'devstral-2512:free': 'Devstral',
+};
 
 interface User {
   id: string;
@@ -83,6 +93,7 @@ interface Grade {
   maxGrade: number;
   date: string;
   comment: string | null;
+  isStudentAdded?: boolean;
 }
 
 interface AgendaItem {
@@ -124,11 +135,41 @@ interface UserItem {
 
 interface ChatMessage { role: 'user' | 'assistant'; content: string; }
 
+interface ScheduleItem {
+  id: string;
+  day: string;
+  period: number;
+  subject: string;
+  room: string | null;
+  teacher: string | null;
+  startTime: string;
+  endTime: string;
+}
+
+interface Keuzeles {
+  id: string;
+  name: string;
+  description: string | null;
+  teacher: string | null;
+  maxStudents: number;
+  day: string | null;
+  period: string | null;
+  students?: { user: { id: string; username: string } }[];
+  _count?: { students: number };
+}
+
+interface ChatHistoryItem {
+  id: string;
+  subject: string | null;
+  model: string;
+  messages: string;
+  updatedAt: string;
+}
+
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
   const [activeTab, setActiveTab] = useState<string>('materials');
   
@@ -150,6 +191,11 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatModel, setChatModel] = useState('glm-4.5-air:free');
+  const [chatSubject, setChatSubject] = useState('algemeen');
+  const [chatHistoryId, setChatHistoryId] = useState<string | null>(null);
+  const [chatHistories, setChatHistories] = useState<ChatHistoryItem[]>([]);
+  const [showChatHistory, setShowChatHistory] = useState(false);
   
   const [grades, setGrades] = useState<Grade[]>([]);
   const [addGradeDialogOpen, setAddGradeDialogOpen] = useState(false);
@@ -183,9 +229,38 @@ export default function Home() {
   
   const [users, setUsers] = useState<UserItem[]>([]);
   const [subjects, setSubjects] = useState(DEFAULT_SUBJECTS);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [siteName, setSiteName] = useState('EduLearn AI');
-  const [siteLogo, setSiteLogo] = useState('/logo.svg');
+  
+  // Schedule state
+  const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
+  const [addScheduleDialogOpen, setAddScheduleDialogOpen] = useState(false);
+  const [editScheduleItem, setEditScheduleItem] = useState<ScheduleItem | null>(null);
+  const [newScheduleDay, setNewScheduleDay] = useState('maandag');
+  const [newSchedulePeriod, setNewSchedulePeriod] = useState(1);
+  const [newScheduleSubject, setNewScheduleSubject] = useState('algemeen');
+  const [newScheduleRoom, setNewScheduleRoom] = useState('');
+  const [newScheduleTeacher, setNewScheduleTeacher] = useState('');
+  const [newScheduleStartTime, setNewScheduleStartTime] = useState('08:30');
+  const [newScheduleEndTime, setNewScheduleEndTime] = useState('09:20');
+  
+  // Keuzelessen state
+  const [keuzelessen, setKeuzelessen] = useState<Keuzeles[]>([]);
+  const [userKeuzelessen, setUserKeuzelessen] = useState<string[]>([]);
+  const [addKeuzelesDialogOpen, setAddKeuzelesDialogOpen] = useState(false);
+  const [newKeuzelesName, setNewKeuzelesName] = useState('');
+  const [newKeuzelesDescription, setNewKeuzelesDescription] = useState('');
+  const [newKeuzelesTeacher, setNewKeuzelesTeacher] = useState('');
+  const [newKeuzelesMaxStudents, setNewKeuzelesMaxStudents] = useState('30');
+  const [newKeuzelesDay, setNewKeuzelesDay] = useState('');
+  const [newKeuzelesPeriod, setNewKeuzelesPeriod] = useState('');
+  
+  // Subject editing state
+  const [editSubjectDialogOpen, setEditSubjectDialogOpen] = useState(false);
+  const [editSubject, setEditSubject] = useState<{id: string; name: string; displayName: string; icon: string; color: string} | null>(null);
+  const [addSubjectDialogOpen, setAddSubjectDialogOpen] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [newSubjectDisplayName, setNewSubjectDisplayName] = useState('');
+  const [newSubjectIcon, setNewSubjectIcon] = useState('📚');
   
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -206,13 +281,16 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      const [filesRes, gradesRes, agendaRes, supportRes, subjectsRes, settingsRes] = await Promise.all([
+      const [filesRes, gradesRes, agendaRes, supportRes, subjectsRes, settingsRes, scheduleRes, keuzelessenRes, chatHistoryRes] = await Promise.all([
         fetch('/api/files').catch(() => null),
         fetch('/api/grades').catch(() => null),
         fetch('/api/agenda').catch(() => null),
         fetch('/api/support').catch(() => null),
         fetch('/api/subjects').catch(() => null),
         fetch('/api/settings').catch(() => null),
+        fetch('/api/schedule').catch(() => null),
+        fetch('/api/keuzelessen').catch(() => null),
+        fetch('/api/chat-history').catch(() => null),
       ]);
       
       if (filesRes?.ok) { const data = await filesRes.json(); setFiles(data.files || []); }
@@ -220,7 +298,10 @@ export default function Home() {
       if (agendaRes?.ok) { const data = await agendaRes.json(); setAgenda(data.agenda || []); }
       if (supportRes?.ok) { const data = await supportRes.json(); setSupportMessages(data.messages || []); }
       if (subjectsRes?.ok) { const data = await subjectsRes.json(); if (data.subjects?.length) setSubjects(data.subjects); }
-      if (settingsRes?.ok) { const data = await settingsRes.json(); if (data.settings) { setSiteName(data.settings.siteName || 'EduLearn AI'); setSiteLogo(data.settings.logo || '/logo.svg'); } }
+      if (settingsRes?.ok) { const data = await settingsRes.json(); if (data.settings) { setSiteName(data.settings.siteName || 'EduLearn AI'); } }
+      if (scheduleRes?.ok) { const data = await scheduleRes.json(); setSchedule(data.schedule || []); }
+      if (keuzelessenRes?.ok) { const data = await keuzelessenRes.json(); setKeuzelessen(data.keuzelessen || []); setUserKeuzelessen(data.userKeuzelessen || []); }
+      if (chatHistoryRes?.ok) { const data = await chatHistoryRes.json(); setChatHistories(data.histories || []); }
       
       if (user?.isAdmin) {
         const [usersRes, bugsRes] = await Promise.all([
@@ -326,9 +407,23 @@ export default function Home() {
     setChatMessages(prev => [...prev, { role: 'user', content: msg }]);
     setChatLoading(true);
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg }) });
+      const res = await fetch('/api/chat', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ 
+          message: msg, 
+          subject: chatSubject,
+          model: chatModel,
+          chatHistory: chatMessages,
+          saveHistory: true,
+          historyId: chatHistoryId
+        }) 
+      });
       const data = await res.json();
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || 'Er ging iets mis.' }]);
+      if (data.historyId && !chatHistoryId) {
+        setChatHistoryId(data.historyId);
+      }
     } catch {
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Er ging iets mis.' }]);
     } finally {
@@ -336,17 +431,80 @@ export default function Home() {
     }
   };
 
+  const loadChatHistory = async (historyId: string) => {
+    try {
+      const res = await fetch(`/api/chat-history?id=${historyId}`);
+      const data = await res.json();
+      if (data.history) {
+        const messages = JSON.parse(data.history.messages);
+        setChatMessages(messages);
+        setChatHistoryId(historyId);
+        setChatSubject(data.history.subject || 'algemeen');
+        setChatModel(data.history.model || 'glm-4.5-air:free');
+        setShowChatHistory(false);
+      }
+    } catch {
+      toast({ title: 'Fout', description: 'Kon geschiedenis niet laden', variant: 'destructive' });
+    }
+  };
+
+  const deleteChatHistory = async (historyId: string) => {
+    if (!confirm('Verwijderen?')) return;
+    await fetch(`/api/chat-history?id=${historyId}`, { method: 'DELETE' });
+    setChatHistories(chatHistories.filter(h => h.id !== historyId));
+    if (chatHistoryId === historyId) {
+      setChatMessages([]);
+      setChatHistoryId(null);
+    }
+    toast({ title: 'Succes', description: 'Verwijderd!' });
+  };
+
+  const startNewChat = () => {
+    setChatMessages([]);
+    setChatHistoryId(null);
+  };
+
   const handleAddGrade = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/grades', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: newGradeStudentId, subject: newGradeSubject, testName: newGradeTestName, grade: newGradeValue, maxGrade: newGradeMaxValue, date: newGradeDate, comment: newGradeComment || null }) });
+      const body: Record<string, unknown> = {
+        subject: newGradeSubject,
+        testName: newGradeTestName,
+        grade: newGradeValue,
+        maxGrade: newGradeMaxValue,
+        date: newGradeDate,
+        comment: newGradeComment || null,
+      };
+      
+      // Admin selects student, student adds for themselves
+      if (user?.isAdmin && newGradeStudentId) {
+        body.studentId = newGradeStudentId;
+      }
+      
+      const res = await fetch('/api/grades', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(body) 
+      });
       if (!res.ok) throw new Error('Fout');
       setAddGradeDialogOpen(false);
+      // Reset form
+      setNewGradeTestName('');
+      setNewGradeValue('');
+      setNewGradeComment('');
+      setNewGradeStudentId('');
       fetchData();
       toast({ title: 'Succes', description: 'Cijfer toegevoegd!' });
     } catch {
       toast({ title: 'Fout', variant: 'destructive' });
     }
+  };
+
+  const handleDeleteGrade = async (id: string) => {
+    if (!confirm('Verwijderen?')) return;
+    await fetch(`/api/grades?id=${id}`, { method: 'DELETE' });
+    setGrades(grades.filter(g => g.id !== id));
+    toast({ title: 'Succes', description: 'Cijfer verwijderd!' });
   };
 
   const handleAddAgenda = async (e: React.FormEvent) => {
@@ -405,6 +563,160 @@ export default function Home() {
     setBugReports(bugReports.filter(b => b.id !== id));
   };
 
+  // Schedule handlers
+  const handleAddSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const body = editScheduleItem 
+        ? { id: editScheduleItem.id, day: newScheduleDay, period: newSchedulePeriod, subject: newScheduleSubject, room: newScheduleRoom || null, teacher: newScheduleTeacher || null, startTime: newScheduleStartTime, endTime: newScheduleEndTime }
+        : { day: newScheduleDay, period: newSchedulePeriod, subject: newScheduleSubject, room: newScheduleRoom || null, teacher: newScheduleTeacher || null, startTime: newScheduleStartTime, endTime: newScheduleEndTime };
+      
+      const res = await fetch('/api/schedule', {
+        method: editScheduleItem ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Fout');
+      setAddScheduleDialogOpen(false);
+      setEditScheduleItem(null);
+      fetchData();
+      toast({ title: 'Succes', description: editScheduleItem ? 'Bijgewerkt!' : 'Toegevoegd!' });
+    } catch {
+      toast({ title: 'Fout', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteSchedule = async (id: string) => {
+    if (!confirm('Verwijderen?')) return;
+    await fetch(`/api/schedule?id=${id}`, { method: 'DELETE' });
+    setSchedule(schedule.filter(s => s.id !== id));
+    toast({ title: 'Succes', description: 'Verwijderd!' });
+  };
+
+  const openEditSchedule = (item: ScheduleItem) => {
+    setEditScheduleItem(item);
+    setNewScheduleDay(item.day);
+    setNewSchedulePeriod(item.period);
+    setNewScheduleSubject(item.subject);
+    setNewScheduleRoom(item.room || '');
+    setNewScheduleTeacher(item.teacher || '');
+    setNewScheduleStartTime(item.startTime);
+    setNewScheduleEndTime(item.endTime);
+    setAddScheduleDialogOpen(true);
+  };
+
+  // Keuzelessen handlers
+  const handleAddKeuzeles = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/keuzelessen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newKeuzelesName,
+          description: newKeuzelesDescription || null,
+          teacher: newKeuzelesTeacher || null,
+          maxStudents: parseInt(newKeuzelesMaxStudents) || 30,
+          day: newKeuzelesDay || null,
+          period: newKeuzelesPeriod || null,
+        }),
+      });
+      if (!res.ok) throw new Error('Fout');
+      setAddKeuzelesDialogOpen(false);
+      setNewKeuzelesName('');
+      setNewKeuzelesDescription('');
+      setNewKeuzelesTeacher('');
+      setNewKeuzelesMaxStudents('30');
+      fetchData();
+      toast({ title: 'Succes', description: 'Keuzeles toegevoegd!' });
+    } catch {
+      toast({ title: 'Fout', variant: 'destructive' });
+    }
+  };
+
+  const handleSelectKeuzeles = async (keuzelesId: string) => {
+    try {
+      const res = await fetch('/api/keuzelessen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectKeuzeles: keuzelesId }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        toast({ title: 'Fout', description: data.error, variant: 'destructive' });
+        return;
+      }
+      if (data.selected) {
+        setUserKeuzelessen([...userKeuzelessen, keuzelesId]);
+        toast({ title: 'Succes', description: 'Keuzeles geselecteerd!' });
+      } else {
+        setUserKeuzelessen(userKeuzelessen.filter(id => id !== keuzelesId));
+        toast({ title: 'Succes', description: 'Keuzeles verwijderd!' });
+      }
+      fetchData();
+    } catch {
+      toast({ title: 'Fout', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteKeuzeles = async (id: string) => {
+    if (!confirm('Verwijderen?')) return;
+    await fetch(`/api/keuzelessen?id=${id}`, { method: 'DELETE' });
+    setKeuzelessen(keuzelessen.filter(k => k.id !== id));
+    toast({ title: 'Succes', description: 'Verwijderd!' });
+  };
+
+  // Subject handlers
+  const handleAddSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/subjects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newSubjectName,
+          displayName: newSubjectDisplayName,
+          icon: newSubjectIcon,
+        }),
+      });
+      if (!res.ok) throw new Error('Fout');
+      setAddSubjectDialogOpen(false);
+      setNewSubjectName('');
+      setNewSubjectDisplayName('');
+      setNewSubjectIcon('📚');
+      fetchData();
+      toast({ title: 'Succes', description: 'Vak toegevoegd!' });
+    } catch {
+      toast({ title: 'Fout', variant: 'destructive' });
+    }
+  };
+
+  const handleUpdateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editSubject) return;
+    try {
+      const res = await fetch('/api/subjects', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editSubject),
+      });
+      if (!res.ok) throw new Error('Fout');
+      setEditSubjectDialogOpen(false);
+      setEditSubject(null);
+      fetchData();
+      toast({ title: 'Succes', description: 'Vak bijgewerkt!' });
+    } catch {
+      toast({ title: 'Fout', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteSubject = async (id: string) => {
+    if (!confirm('Verwijderen?')) return;
+    await fetch(`/api/subjects?id=${id}`, { method: 'DELETE' });
+    setSubjects(subjects.filter(s => s.id !== id));
+    toast({ title: 'Succes', description: 'Vak verwijderd!' });
+  };
+
   const getGradeColor = (g: number, m: number) => {
     const p = (g / m) * 100;
     return p >= 80 ? 'text-green-600 bg-green-50' : p >= 60 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50';
@@ -414,12 +726,12 @@ export default function Home() {
 
   const getSubject = (n: string) => subjects.find(s => s.name === n) || { displayName: n, icon: '📚' };
 
+  const getScheduleForDayAndPeriod = (day: string, period: number) => {
+    return schedule.find(s => s.day === day && s.period === period);
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center"><BookOpen className="h-12 w-12 animate-bounce text-primary" /></div>;
-  }
-
-  if (error) {
-    return <div className="min-h-screen flex items-center justify-center flex-col gap-4"><p className="text-red-500">{error}</p><Button onClick={() => { setError(null); checkAuth(); }}>Opnieuw proberen</Button></div>;
   }
 
   if (!user) {
@@ -497,14 +809,20 @@ export default function Home() {
       
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-2 flex gap-2 overflow-x-auto">
-          {['materials', 'grades', 'agenda', 'support', ...(user.isAdmin ? ['admin'] : [])].map(tab => (
+          {['materials', 'grades', 'agenda', 'schedule', 'keuzelessen', 'support', ...(user.isAdmin ? ['admin'] : [])].map(tab => (
             <Button key={tab} variant={activeTab === tab ? 'default' : 'ghost'} size="sm" onClick={() => setActiveTab(tab)}>
               {tab === 'materials' && <FileText className="h-4 w-4 mr-2" />}
               {tab === 'grades' && <GraduationCap className="h-4 w-4 mr-2" />}
               {tab === 'agenda' && <Calendar className="h-4 w-4 mr-2" />}
+              {tab === 'schedule' && <Clock className="h-4 w-4 mr-2" />}
+              {tab === 'keuzelessen' && <BookMarked className="h-4 w-4 mr-2" />}
               {tab === 'support' && <MessageCircle className="h-4 w-4 mr-2" />}
               {tab === 'admin' && <Users className="h-4 w-4 mr-2" />}
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'materials' ? 'Lesmateriaal' : 
+               tab === 'grades' ? 'Cijfers' : 
+               tab === 'schedule' ? 'Rooster' :
+               tab === 'keuzelessen' ? 'Keuzelessen' :
+               tab.charAt(0).toUpperCase() + tab.slice(1)}
             </Button>
           ))}
         </div>
@@ -537,9 +855,10 @@ export default function Home() {
                   </Dialog>
                 )}
               </div>
-              {files.length === 0 ? <Card><CardContent className="py-12 text-center text-muted-foreground">Geen materialen</CardContent></Card> : (
+              {files.filter(f => f.subject === uploadSubject || uploadSubject === 'algemeen').length === 0 ? 
+                <Card><CardContent className="py-12 text-center text-muted-foreground">Geen materialen</CardContent></Card> : (
                 <div className="grid sm:grid-cols-2 gap-4">
-                  {files.map(f => (
+                  {files.filter(f => f.subject === uploadSubject || uploadSubject === 'algemeen').map(f => (
                     <Card key={f.id}>
                       <CardHeader><CardTitle>{f.title}</CardTitle><CardDescription>{f.description}</CardDescription></CardHeader>
                       <CardContent className="text-xs text-muted-foreground">{getSubject(f.subject).icon} {getSubject(f.subject).displayName} • {f.author.username}</CardContent>
@@ -553,20 +872,65 @@ export default function Home() {
               )}
             </div>
             <div>
-              <Card className="h-[500px] flex flex-col">
-                <CardHeader><CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" />AI Assistent</CardTitle></CardHeader>
-                <ScrollArea className="flex-1 p-4">
-                  {chatMessages.map((m, i) => (
-                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
-                      <div className={`max-w-[80%] rounded px-3 py-2 text-sm ${m.role === 'user' ? 'bg-primary text-white' : 'bg-muted'}`}>{m.content}</div>
+              <Card className="h-[600px] flex flex-col">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" />AI Assistent</CardTitle>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => setShowChatHistory(!showChatHistory)}><History className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="sm" onClick={startNewChat}><Plus className="h-4 w-4" /></Button>
                     </div>
-                  ))}
-                  {chatLoading && <div className="text-center text-sm text-muted-foreground">...</div>}
-                  <div ref={chatEndRef} />
-                </ScrollArea>
+                  </div>
+                </CardHeader>
+                <div className="px-4 pb-2 space-y-2">
+                  <div className="flex gap-2">
+                    <select className="flex-1 border rounded px-2 py-1 text-sm" value={chatSubject} onChange={(e) => setChatSubject(e.target.value)}>
+                      {subjects.map(s => <option key={s.id} value={s.name}>{s.icon} {s.displayName}</option>)}
+                    </select>
+                    <select className="flex-1 border rounded px-2 py-1 text-sm" value={chatModel} onChange={(e) => setChatModel(e.target.value)}>
+                      {Object.entries(AI_MODELS).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                    </select>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <Sparkles className="h-3 w-3 inline mr-1" />
+                    AI scant bestanden voor {getSubject(chatSubject).displayName}
+                  </p>
+                </div>
+                
+                {showChatHistory ? (
+                  <ScrollArea className="flex-1 p-4">
+                    <div className="space-y-2">
+                      {chatHistories.length === 0 ? <p className="text-center text-muted-foreground text-sm">Geen geschiedenis</p> :
+                        chatHistories.map(h => (
+                          <div key={h.id} className={`border rounded p-2 cursor-pointer hover:bg-muted ${chatHistoryId === h.id ? 'bg-muted' : ''}`}>
+                            <div className="flex justify-between items-start">
+                              <div onClick={() => loadChatHistory(h.id)} className="flex-1">
+                                <p className="font-medium text-sm">{h.subject ? getSubject(h.subject).displayName : 'Algemeen'}</p>
+                                <p className="text-xs text-muted-foreground">{AI_MODELS[h.model] || h.model}</p>
+                                <p className="text-xs text-muted-foreground">{new Date(h.updatedAt).toLocaleDateString('nl-NL')}</p>
+                              </div>
+                              <Button variant="ghost" size="sm" onClick={() => deleteChatHistory(h.id)}><Trash2 className="h-3 w-3 text-red-500" /></Button>
+                            </div>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <ScrollArea className="flex-1 p-4">
+                    {chatMessages.map((m, i) => (
+                      <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
+                        <div className={`max-w-[80%] rounded px-3 py-2 text-sm ${m.role === 'user' ? 'bg-primary text-white' : 'bg-muted'}`}>{m.content}</div>
+                      </div>
+                    ))}
+                    {chatLoading && <div className="text-center text-sm text-muted-foreground">...</div>}
+                    <div ref={chatEndRef} />
+                  </ScrollArea>
+                )}
+                
                 <div className="p-4 border-t">
                   <form onSubmit={handleChat} className="flex gap-2">
-                    <Input placeholder="Vraag..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} className="flex-1" />
+                    <Input placeholder="Stel een vraag over dit vak..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} className="flex-1" />
                     <Button type="submit" size="icon" disabled={chatLoading}><Send className="h-4 w-4" /></Button>
                   </form>
                 </div>
@@ -579,43 +943,44 @@ export default function Home() {
           <div className="max-w-4xl mx-auto space-y-4">
             <div className="flex justify-between">
               <h2 className="text-xl font-semibold"><GraduationCap className="h-5 w-5 inline mr-2" />Mijn Cijfers</h2>
-              {user.isAdmin && (
-                <Dialog open={addGradeDialogOpen} onOpenChange={setAddGradeDialogOpen}>
-                  <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Toevoegen</Button></DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader><DialogTitle>Cijfer Toevoegen</DialogTitle></DialogHeader>
-                    <form onSubmit={handleAddGrade} className="space-y-4">
-                      <select className="w-full border rounded px-3 py-2" value={newGradeStudentId} onChange={(e) => setNewGradeStudentId(e.target.value)} required>
-                        <option value="">Selecteer leerling</option>
+              <Dialog open={addGradeDialogOpen} onOpenChange={setAddGradeDialogOpen}>
+                <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Cijfer Toevoegen</Button></DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Cijfer Toevoegen</DialogTitle></DialogHeader>
+                  <form onSubmit={handleAddGrade} className="space-y-4">
+                    {user.isAdmin && (
+                      <select className="w-full border rounded px-3 py-2" value={newGradeStudentId} onChange={(e) => setNewGradeStudentId(e.target.value)}>
+                        <option value="">Selecteer leerling (of laat leeg voor jezelf)</option>
                         {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
                       </select>
-                      <select className="w-full border rounded px-3 py-2" value={newGradeSubject} onChange={(e) => setNewGradeSubject(e.target.value)}>
-                        {subjects.map(s => <option key={s.id} value={s.name}>{s.icon} {s.displayName}</option>)}
-                      </select>
-                      <Input placeholder="Toetsnaam" value={newGradeTestName} onChange={(e) => setNewGradeTestName(e.target.value)} required />
-                      <div className="grid grid-cols-2 gap-4">
-                        <Input type="number" step="0.1" placeholder="Cijfer" value={newGradeValue} onChange={(e) => setNewGradeValue(e.target.value)} required />
-                        <Input type="number" step="0.1" placeholder="Max" value={newGradeMaxValue} onChange={(e) => setNewGradeMaxValue(e.target.value)} />
-                      </div>
-                      <Input type="date" value={newGradeDate} onChange={(e) => setNewGradeDate(e.target.value)} />
-                      <Input placeholder="Opmerking" value={newGradeComment} onChange={(e) => setNewGradeComment(e.target.value)} />
-                      <Button type="submit">Toevoegen</Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              )}
+                    )}
+                    <select className="w-full border rounded px-3 py-2" value={newGradeSubject} onChange={(e) => setNewGradeSubject(e.target.value)}>
+                      {subjects.map(s => <option key={s.id} value={s.name}>{s.icon} {s.displayName}</option>)}
+                    </select>
+                    <Input placeholder="Toetsnaam" value={newGradeTestName} onChange={(e) => setNewGradeTestName(e.target.value)} required />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input type="number" step="0.1" placeholder="Cijfer" value={newGradeValue} onChange={(e) => setNewGradeValue(e.target.value)} required />
+                      <Input type="number" step="0.1" placeholder="Max" value={newGradeMaxValue} onChange={(e) => setNewGradeMaxValue(e.target.value)} />
+                    </div>
+                    <Input type="date" value={newGradeDate} onChange={(e) => setNewGradeDate(e.target.value)} />
+                    <Input placeholder="Opmerking (optioneel)" value={newGradeComment} onChange={(e) => setNewGradeComment(e.target.value)} />
+                    <Button type="submit">Toevoegen</Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
-            {grades.length === 0 ? <Card><CardContent className="py-12 text-center text-muted-foreground">Geen cijfers</CardContent></Card> : (
+            {grades.length === 0 ? <Card><CardContent className="py-12 text-center text-muted-foreground">Geen cijfers - Voeg je eerste cijfer toe!</CardContent></Card> : (
               <Card>
                 <Table>
-                  <TableHeader><TableRow><TableHead>Vak</TableHead><TableHead>Toets</TableHead><TableHead className="text-center">Cijfer</TableHead><TableHead>Datum</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Vak</TableHead><TableHead>Toets</TableHead><TableHead className="text-center">Cijfer</TableHead><TableHead>Datum</TableHead><TableHead></TableHead></TableRow></TableHeader>
                   <TableBody>
                     {grades.map(g => (
                       <TableRow key={g.id}>
-                        <TableCell>{getSubject(g.subject).icon} {getSubject(g.subject).displayName}</TableCell>
+                        <TableCell>{getSubject(g.subject).icon} {getSubject(g.subject).displayName} {g.isStudentAdded && <Badge variant="outline" className="ml-1 text-xs">Zelf</Badge>}</TableCell>
                         <TableCell>{g.testName}</TableCell>
                         <TableCell className="text-center"><span className={`px-2 py-1 rounded font-bold ${getGradeColor(g.grade, g.maxGrade)}`}>{g.grade.toFixed(1)}/{g.maxGrade}</span></TableCell>
                         <TableCell>{new Date(g.date).toLocaleDateString('nl-NL')}</TableCell>
+                        <TableCell>{(user.isAdmin || g.isStudentAdded) && <Button variant="ghost" size="sm" onClick={() => handleDeleteGrade(g.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -682,6 +1047,163 @@ export default function Home() {
           </div>
         )}
 
+        {activeTab === 'schedule' && (
+          <div className="max-w-6xl mx-auto space-y-4">
+            <div className="flex justify-between">
+              <h2 className="text-xl font-semibold"><Clock className="h-5 w-5 inline mr-2" />Rooster</h2>
+              {user.isAdmin && (
+                <Dialog open={addScheduleDialogOpen} onOpenChange={(open) => { setAddScheduleDialogOpen(open); if (!open) setEditScheduleItem(null); }}>
+                  <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Toevoegen</Button></DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>{editScheduleItem ? 'Bewerken' : 'Toevoegen'}</DialogTitle></DialogHeader>
+                    <form onSubmit={handleAddSchedule} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <select className="w-full border rounded px-3 py-2" value={newScheduleDay} onChange={(e) => setNewScheduleDay(e.target.value)}>
+                          {DAYS.map(d => <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>)}
+                        </select>
+                        <select className="w-full border rounded px-3 py-2" value={newSchedulePeriod} onChange={(e) => setNewSchedulePeriod(parseInt(e.target.value))}>
+                          {PERIODS.map(p => <option key={p} value={p}>{p}e uur</option>)}
+                        </select>
+                      </div>
+                      <select className="w-full border rounded px-3 py-2" value={newScheduleSubject} onChange={(e) => setNewScheduleSubject(e.target.value)}>
+                        {subjects.map(s => <option key={s.id} value={s.name}>{s.icon} {s.displayName}</option>)}
+                      </select>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input placeholder="Lokaal" value={newScheduleRoom} onChange={(e) => setNewScheduleRoom(e.target.value)} />
+                        <Input placeholder="Docent" value={newScheduleTeacher} onChange={(e) => setNewScheduleTeacher(e.target.value)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs">Start</Label>
+                          <Input type="time" value={newScheduleStartTime} onChange={(e) => setNewScheduleStartTime(e.target.value)} />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Einde</Label>
+                          <Input type="time" value={newScheduleEndTime} onChange={(e) => setNewScheduleEndTime(e.target.value)} />
+                        </div>
+                      </div>
+                      <Button type="submit">{editScheduleItem ? 'Bijwerken' : 'Toevoegen'}</Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+            <Card>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-20">Uur</TableHead>
+                      {DAYS.map(d => <TableHead key={d} className="text-center min-w-[120px]">{d.charAt(0).toUpperCase() + d.slice(1)}</TableHead>)}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {PERIODS.map(period => (
+                      <TableRow key={period}>
+                        <TableCell className="font-medium">{period}e</TableCell>
+                        {DAYS.map(day => {
+                          const item = getScheduleForDayAndPeriod(day, period);
+                          return (
+                            <TableCell key={`${day}-${period}`} className="text-center p-1">
+                              {item ? (
+                                <div className="bg-primary/10 rounded p-2 text-sm relative group">
+                                  <p className="font-medium">{getSubject(item.subject).icon} {getSubject(item.subject).displayName}</p>
+                                  {item.room && <p className="text-xs text-muted-foreground">{item.room}</p>}
+                                  {item.teacher && <p className="text-xs text-muted-foreground">{item.teacher}</p>}
+                                  {user.isAdmin && (
+                                    <div className="absolute top-1 right-1 hidden group-hover:flex gap-1">
+                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditSchedule(item)}><Edit className="h-3 w-3" /></Button>
+                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500" onClick={() => handleDeleteSchedule(item.id)}><Trash2 className="h-3 w-3" /></Button>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="h-12"></div>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'keuzelessen' && (
+          <div className="max-w-4xl mx-auto space-y-4">
+            <div className="flex justify-between">
+              <h2 className="text-xl font-semibold"><BookMarked className="h-5 w-5 inline mr-2" />Keuzelessen</h2>
+              {user.isAdmin && (
+                <Dialog open={addKeuzelesDialogOpen} onOpenChange={setAddKeuzelesDialogOpen}>
+                  <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Toevoegen</Button></DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Keuzeles Toevoegen</DialogTitle></DialogHeader>
+                    <form onSubmit={handleAddKeuzeles} className="space-y-4">
+                      <Input placeholder="Naam" value={newKeuzelesName} onChange={(e) => setNewKeuzelesName(e.target.value)} required />
+                      <Textarea placeholder="Beschrijving" value={newKeuzelesDescription} onChange={(e) => setNewKeuzelesDescription(e.target.value)} />
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input placeholder="Docent" value={newKeuzelesTeacher} onChange={(e) => setNewKeuzelesTeacher(e.target.value)} />
+                        <Input type="number" placeholder="Max studenten" value={newKeuzelesMaxStudents} onChange={(e) => setNewKeuzelesMaxStudents(e.target.value)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input placeholder="Dag (optioneel)" value={newKeuzelesDay} onChange={(e) => setNewKeuzelesDay(e.target.value)} />
+                        <Input placeholder="Tijd (optioneel)" value={newKeuzelesPeriod} onChange={(e) => setNewKeuzelesPeriod(e.target.value)} />
+                      </div>
+                      <Button type="submit">Toevoegen</Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+            {keuzelessen.length === 0 ? <Card><CardContent className="py-12 text-center text-muted-foreground">Geen keuzelessen beschikbaar</CardContent></Card> : (
+              <div className="grid md:grid-cols-2 gap-4">
+                {keuzelessen.map(k => {
+                  const isSelected = userKeuzelessen.includes(k.id);
+                  const studentCount = k._count?.students || k.students?.length || 0;
+                  const isFull = studentCount >= k.maxStudents;
+                  return (
+                    <Card key={k.id} className={isSelected ? 'border-primary bg-primary/5' : ''}>
+                      <CardHeader>
+                        <div className="flex justify-between">
+                          <CardTitle>{k.name}</CardTitle>
+                          {user.isAdmin && (
+                            <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDeleteKeuzeles(k.id)}><Trash2 className="h-4 w-4" /></Button>
+                          )}
+                        </div>
+                        <CardDescription>{k.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {k.teacher && <p className="text-sm"><strong>Docent:</strong> {k.teacher}</p>}
+                        {(k.day || k.period) && <p className="text-sm"><strong>Wanneer:</strong> {k.day} {k.period}</p>}
+                        <p className="text-sm"><strong>Deelnemers:</strong> {studentCount}/{k.maxStudents}</p>
+                      </CardContent>
+                      <CardFooter>
+                        {!user.isAdmin ? (
+                          <Button 
+                            className="w-full" 
+                            variant={isSelected ? 'default' : 'outline'}
+                            onClick={() => handleSelectKeuzeles(k.id)}
+                            disabled={!isSelected && isFull}
+                          >
+                            {isSelected ? <><CheckCircle className="h-4 w-4 mr-2" />Geselecteerd</> : isFull ? 'Vol' : 'Selecteren'}
+                          </Button>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            {studentCount} leerlingen ingeschreven
+                          </p>
+                        )}
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'support' && (
           <div className="max-w-4xl mx-auto space-y-4">
             <h2 className="text-xl font-semibold"><MessageCircle className="h-5 w-5 inline mr-2" />Ondersteuning</h2>
@@ -728,6 +1250,55 @@ export default function Home() {
           <div className="max-w-5xl mx-auto space-y-6">
             <h2 className="text-xl font-semibold"><Settings className="h-5 w-5 inline mr-2" />Admin Paneel</h2>
             
+            {/* Vakken Beheer */}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Vakken Beheren</CardTitle>
+                  <Dialog open={addSubjectDialogOpen} onOpenChange={setAddSubjectDialogOpen}>
+                    <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Vak Toevoegen</Button></DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader><DialogTitle>Vak Toevoegen</DialogTitle></DialogHeader>
+                      <form onSubmit={handleAddSubject} className="space-y-4">
+                        <Input placeholder="Naam (bijv. wiskunde)" value={newSubjectName} onChange={(e) => setNewSubjectName(e.target.value)} required />
+                        <Input placeholder="Weergavenaam (bijv. Wiskunde)" value={newSubjectDisplayName} onChange={(e) => setNewSubjectDisplayName(e.target.value)} required />
+                        <Input placeholder="Icon (bijv. 📐)" value={newSubjectIcon} onChange={(e) => setNewSubjectIcon(e.target.value)} />
+                        <Button type="submit">Toevoegen</Button>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {subjects.map(s => (
+                    <div key={s.id} className="border rounded p-3 flex justify-between items-center group">
+                      <span>{s.icon} {s.displayName}</span>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditSubject(s); setEditSubjectDialogOpen(true); }}><Edit className="h-3 w-3" /></Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={() => handleDeleteSubject(s.id)}><Trash2 className="h-3 w-3" /></Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Dialog open={editSubjectDialogOpen} onOpenChange={setEditSubjectDialogOpen}>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Vak Bewerken</DialogTitle></DialogHeader>
+                {editSubject && (
+                  <form onSubmit={handleUpdateSubject} className="space-y-4">
+                    <Input placeholder="Naam" value={editSubject.name} onChange={(e) => setEditSubject({...editSubject, name: e.target.value})} />
+                    <Input placeholder="Weergavenaam" value={editSubject.displayName} onChange={(e) => setEditSubject({...editSubject, displayName: e.target.value})} />
+                    <Input placeholder="Icon" value={editSubject.icon || ''} onChange={(e) => setEditSubject({...editSubject, icon: e.target.value})} />
+                    <Button type="submit">Opslaan</Button>
+                  </form>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            {/* Bug Reports */}
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2"><Bug className="h-5 w-5" />Bug Reports {bugReports.filter(b => b.status === 'open').length > 0 && <Badge variant="destructive">{bugReports.filter(b => b.status === 'open').length}</Badge>}</CardTitle></CardHeader>
               <CardContent>
@@ -757,6 +1328,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
+            {/* Gebruikers */}
             <Card>
               <CardHeader><CardTitle><Users className="h-5 w-5 inline mr-2" />Gebruikers</CardTitle></CardHeader>
               <CardContent>
@@ -777,21 +1349,19 @@ export default function Home() {
                 )}
               </CardContent>
             </Card>
-
-            <div className="grid grid-cols-3 gap-4">
-              <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{users.length}</div><p className="text-sm text-muted-foreground">Gebruikers</p></CardContent></Card>
-              <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{users.filter(u => !u.isAdmin).length}</div><p className="text-sm text-muted-foreground">Leerlingen</p></CardContent></Card>
-              <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{bugReports.filter(b => b.status === 'open').length}</div><p className="text-sm text-muted-foreground">Open Bugs</p></CardContent></Card>
-            </div>
           </div>
         )}
       </main>
 
+      {/* File View Dialog */}
       <Dialog open={viewFileDialogOpen} onOpenChange={setViewFileDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
-          <DialogHeader><DialogTitle>{selectedFile?.title}</DialogTitle><CardDescription>{selectedFile?.description}</CardDescription></DialogHeader>
-          <pre className="whitespace-pre-wrap text-sm">{selectedFile?.content}</pre>
-          <DialogFooter><Button variant="secondary" onClick={() => setViewFileDialogOpen(false)}>Sluiten</Button></DialogFooter>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{selectedFile?.title}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">{selectedFile?.description}</p>
+            <div className="bg-muted rounded p-4 whitespace-pre-wrap text-sm">{selectedFile?.content}</div>
+            {selectedFile?.fileUrl && <a href={selectedFile.fileUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">Bekijk bestand</a>}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

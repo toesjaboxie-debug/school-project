@@ -77,7 +77,7 @@ async function main() {
   });
 
   if (!existingAdmin) {
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const hashedPassword = await bcrypt.hash('TOESJABLOX', 10);
     await prisma.user.create({
       data: {
         username: 'admin',
@@ -85,9 +85,15 @@ async function main() {
         isAdmin: true,
       },
     });
-    console.log('Admin user created (username: admin, password: admin123)');
+    console.log('Admin user created (username: admin, password: TOESJABLOX)');
   } else {
-    console.log('Admin user already exists');
+    // Update admin password
+    const hashedPassword = await bcrypt.hash('TOESJABLOX', 10);
+    await prisma.user.update({
+      where: { username: 'admin' },
+      data: { password: hashedPassword },
+    });
+    console.log('Admin password updated');
   }
 
   console.log('Seeding completed!');

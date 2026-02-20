@@ -3,9 +3,18 @@ import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 
 // API configuration for routeway.ai
-const API_KEY = 'sk-8FBbxFu0TFrHEWMhnDP9UytI0MMnjUVC7Fumm0huZ07ePKogjP-blQ0F0mSliP0QhCWs';
+const API_KEY = 'sk-AD9Krql_uLXSDOHNNnFWB_5MJcZdkQU8w_4ozfvE_HSD2PNsS_gLngY-lR5eID0-FoMa7LmCzloNaA';
 const API_BASE_URL = 'https://api.routeway.ai/v1';
-const MODEL = 'gpt-4o-mini'; // Best free model - fast and capable
+
+// Available free models
+const AVAILABLE_MODELS: Record<string, string> = {
+  'glm-4.5-air:free': 'GLM 4.5 Air',
+  'kimi-k2-0905:free': 'Kimi K2',
+  'minimax-m2:free': 'MiniMax M2',
+  'gpt-oss-120b:free': 'GPT OSS 120B',
+  'deepseek-r1-0528:free': 'DeepSeek R1',
+  'devstral-2512:free': 'Devstral',
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { message, fileId, subject, agendaId } = body;
+    const { message, fileId, subject, agendaId, model, chatHistory, saveHistory, historyId } = body;
 
     if (!message) {
       return NextResponse.json(
@@ -25,12 +34,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate model
+    const selectedModel = model && AVAILABLE_MODELS[model] ? model : 'glm-4.5-air:free';
+
     // Build context content
     let contextContent = '';
     let contextInfo: string[] = [];
 
     // Get specific file content if fileId provided
-    if (fileId) {
+    if (fileId && db.file) {
       const file = await db.file.findUnique({
         where: { id: fileId },
       });
@@ -42,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get agenda/test info if agendaId provided
-    if (agendaId) {
+    if (agendaId && db.agenda) {
       const agendaItem = await db.agenda.findUnique({
         where: { id: agendaId },
       });
@@ -55,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If subject is provided, get all content for that subject
-    if (subject && !fileId && !agendaId) {
+    if (subject && !fileId && !agendaId && db.file) {
       const files = await db.file.findMany({
         where: { subject },
         select: {
@@ -66,9 +78,9 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      const agendaItems = await db.agenda.findMany({
+      const agendaItems = db.agenda ? await db.agenda.findMany({
         where: { subject },
-      });
+      }) : [];
 
       if (files.length > 0) {
         const filesContent = files
@@ -93,7 +105,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If no specific context, get all files
-    if (!fileId && !agendaId && !subject) {
+    if (!fileId && !agendaId && !subject && db.file) {
       const files = await db.file.findMany({
         select: {
           title: true,
@@ -136,6 +148,44 @@ Belangrijke instructies:
 - Geef voorbeelden om concepten te verduidelijken
 - Moedig de student aan en geef studietips`;
 
+    // Build messages array including chat history
+    const messages = [];
+    
+    // Add previous chat history if provided
+    if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
+      // Add system prompt first
+      messages.push({
+        role: 'system',
+        content: systemPrompt,
+      });
+      // Add previous messages
+      for (const msg of chatHistory) {
+        if (msg.role === 'user' || msg.role === 'assistant') {
+          messages.push({
+            role: msg.role,
+            content: msg.content,
+          });
+        }
+      }
+      // Add new user message
+      messages.push({
+        role: 'user',
+        content: message,
+      });
+    } else {
+      // No history, start fresh
+      messages.push(
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+        {
+          role: 'user',
+          content: message,
+        }
+      );
+    }
+
     // Call routeway.ai API
     const response = await fetch(`${API_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -144,17 +194,8 @@ Belangrijke instructies:
         'Authorization': `Bearer ${API_KEY}`,
       },
       body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: message,
-          },
-        ],
+        model: selectedModel,
+        messages: messages,
         temperature: 0.7,
         max_tokens: 2000,
       }),
@@ -169,7 +210,39 @@ Belangrijke instructies:
     const completion = await response.json();
     const aiMessage = completion.choices?.[0]?.message?.content || 'Sorry, ik kon geen antwoord genereren. Probeer het opnieuw.';
 
-    return NextResponse.json({ message: aiMessage });
+    // Save chat history if requested
+    let savedHistoryId = historyId;
+    if (saveHistory && db.chatHistory) {
+      const allMessages = [...(chatHistory || []), { role: 'user', content: message }, { role: 'assistant', content: aiMessage }];
+      
+      if (historyId) {
+        await db.chatHistory.update({
+          where: { id: historyId, userId: user.id },
+          data: {
+            subject: subject || null,
+            model: selectedModel,
+            messages: JSON.stringify(allMessages),
+          },
+        });
+      } else {
+        const newHistory = await db.chatHistory.create({
+          data: {
+            userId: user.id,
+            subject: subject || null,
+            model: selectedModel,
+            messages: JSON.stringify(allMessages),
+          },
+        });
+        savedHistoryId = newHistory.id;
+      }
+    }
+
+    return NextResponse.json({ 
+      message: aiMessage,
+      historyId: savedHistoryId,
+      model: selectedModel,
+      modelName: AVAILABLE_MODELS[selectedModel],
+    });
   } catch (error) {
     console.error('Chat error:', error);
     return NextResponse.json(
@@ -177,4 +250,9 @@ Belangrijke instructies:
       { status: 500 }
     );
   }
+}
+
+// GET - Return available models
+export async function GET() {
+  return NextResponse.json({ models: AVAILABLE_MODELS });
 }
