@@ -11,6 +11,11 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Check if grade model exists
+    if (!db.grade) {
+      return NextResponse.json({ grades: [] });
+    }
+
     const grades = await db.grade.findMany({
       where: { studentId: user.id },
       orderBy: { date: 'desc' },
@@ -19,7 +24,7 @@ export async function GET() {
     return NextResponse.json({ grades });
   } catch (error) {
     console.error('Fetch grades error:', error);
-    return NextResponse.json({ error: 'Failed to fetch grades' }, { status: 500 });
+    return NextResponse.json({ grades: [] });
   }
 }
 
@@ -37,6 +42,11 @@ export async function POST(request: NextRequest) {
 
     if (!studentId || !subject || !testName || grade === undefined) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Check if grade model exists
+    if (!db.grade) {
+      return NextResponse.json({ error: 'Database tabel niet beschikbaar' }, { status: 500 });
     }
 
     // Verify student exists

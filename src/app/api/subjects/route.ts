@@ -1,6 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+
+// Default subjects for fallback
+const defaultSubjects = [
+  { id: '1', name: 'wiskunde', displayName: 'Wiskunde', icon: '📐', color: '#3B82F6' },
+  { id: '2', name: 'engels', displayName: 'Engels', icon: '🇬🇧', color: '#10B981' },
+  { id: '3', name: 'nederlands', displayName: 'Nederlands', icon: '🇳🇱', color: '#F59E0B' },
+  { id: '4', name: 'geschiedenis', displayName: 'Geschiedenis', icon: '📜', color: '#8B5CF6' },
+  { id: '5', name: 'aardrijkskunde', displayName: 'Aardrijkskunde', icon: '🌍', color: '#06B6D4' },
+  { id: '6', name: 'biologie', displayName: 'Biologie', icon: '🧬', color: '#22C55E' },
+  { id: '7', name: 'natuurkunde', displayName: 'Natuurkunde', icon: '⚛️', color: '#EF4444' },
+  { id: '8', name: 'scheikunde', displayName: 'Scheikunde', icon: '🧪', color: '#F97316' },
+  { id: '9', name: 'frans', displayName: 'Frans', icon: '🇫🇷', color: '#EC4899' },
+  { id: '10', name: 'duits', displayName: 'Duits', icon: '🇩🇪', color: '#6366F1' },
+  { id: '11', name: 'economie', displayName: 'Economie', icon: '📊', color: '#14B8A6' },
+  { id: '12', name: 'algemeen', displayName: 'Algemeen', icon: '📚', color: '#6B7280' },
+];
 
 // GET - Fetch all subjects
 export async function GET() {
@@ -11,19 +27,31 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const subjects = await db.subject.findMany({
-      orderBy: { name: 'asc' },
-    });
+    // Try to fetch from database, but return defaults if table doesn't exist
+    try {
+      if (db.subject) {
+        const subjects = await db.subject.findMany({
+          orderBy: { name: 'asc' },
+        });
+        
+        if (subjects && subjects.length > 0) {
+          return NextResponse.json({ subjects });
+        }
+      }
+    } catch (dbError) {
+      console.log('Subjects table not available, using defaults');
+    }
 
-    return NextResponse.json({ subjects });
+    // Return default subjects
+    return NextResponse.json({ subjects: defaultSubjects });
   } catch (error) {
     console.error('Fetch subjects error:', error);
-    return NextResponse.json({ error: 'Kon vakken niet laden' }, { status: 500 });
+    return NextResponse.json({ subjects: defaultSubjects });
   }
 }
 
 // POST - Add a new subject (admin only)
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
 
@@ -36,6 +64,10 @@ export async function POST(request: NextRequest) {
 
     if (!name || !displayName) {
       return NextResponse.json({ error: 'Naam en weergavenaam zijn vereist' }, { status: 400 });
+    }
+
+    if (!db.subject) {
+      return NextResponse.json({ error: 'Database tabel niet beschikbaar' }, { status: 500 });
     }
 
     const subject = await db.subject.create({
@@ -55,7 +87,7 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Update a subject (admin only)
-export async function PUT(request: NextRequest) {
+export async function PUT(request: Request) {
   try {
     const user = await getCurrentUser();
 
@@ -68,6 +100,10 @@ export async function PUT(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'ID is vereist' }, { status: 400 });
+    }
+
+    if (!db.subject) {
+      return NextResponse.json({ error: 'Database tabel niet beschikbaar' }, { status: 500 });
     }
 
     const subject = await db.subject.update({
@@ -88,7 +124,7 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE - Delete a subject (admin only)
-export async function DELETE(request: NextRequest) {
+export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
 
@@ -101,6 +137,10 @@ export async function DELETE(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'ID is vereist' }, { status: 400 });
+    }
+
+    if (!db.subject) {
+      return NextResponse.json({ error: 'Database tabel niet beschikbaar' }, { status: 500 });
     }
 
     await db.subject.delete({

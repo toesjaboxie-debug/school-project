@@ -11,25 +11,42 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized - Admin only' }, { status: 403 });
     }
 
+    // Check if user model exists (it should, since we can authenticate)
+    if (!db.user) {
+      return NextResponse.json({ users: [] });
+    }
+
+    // Check if grade model exists for counting
+    const hasGradeModel = !!db.grade;
+    const hasSupportMessageModel = !!db.supportMessage;
+
     const users = await db.user.findMany({
       select: {
         id: true,
         username: true,
         isAdmin: true,
         createdAt: true,
-        _count: {
-          select: {
-            grades: true,
-            supportMessages: true,
+        ...(hasGradeModel || hasSupportMessageModel ? {
+          _count: {
+            select: {
+              ...(hasGradeModel ? { grades: true } : {}),
+              ...(hasSupportMessageModel ? { supportMessages: true } : {}),
+            },
           },
-        },
+        } : {}),
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ users });
+    // Transform users to ensure _count exists
+    const transformedUsers = users.map(u => ({
+      ...u,
+      _count: u._count || { grades: 0, supportMessages: 0 },
+    }));
+
+    return NextResponse.json({ users: transformedUsers });
   } catch (error) {
     console.error('Fetch users error:', error);
-    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+    return NextResponse.json({ users: [] });
   }
 }

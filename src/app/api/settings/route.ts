@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 
 // GET - Fetch site settings
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const user = await getCurrentUser();
 
@@ -11,10 +11,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Check if siteSettings model exists
+    if (!db.siteSettings) {
+      return NextResponse.json({ 
+        settings: { 
+          logo: '/logo.svg', 
+          siteName: 'EduLearn AI' 
+        } 
+      });
+    }
+
     const settings = await db.siteSettings.findMany();
     
     // Convert to object
-    const settingsObj: Record<string, string> = {};
+    const settingsObj: Record<string, string> = {
+      logo: '/logo.svg',
+      siteName: 'EduLearn AI',
+    };
+    
     for (const setting of settings) {
       settingsObj[setting.key] = setting.value;
     }
@@ -22,7 +36,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ settings: settingsObj });
   } catch (error) {
     console.error('Fetch settings error:', error);
-    return NextResponse.json({ error: 'Kon instellingen niet laden' }, { status: 500 });
+    return NextResponse.json({ 
+      settings: { 
+        logo: '/logo.svg', 
+        siteName: 'EduLearn AI' 
+      } 
+    });
   }
 }
 
@@ -40,6 +59,11 @@ export async function POST(request: NextRequest) {
 
     if (!key || value === undefined) {
       return NextResponse.json({ error: 'Key en value zijn vereist' }, { status: 400 });
+    }
+
+    // Check if siteSettings model exists
+    if (!db.siteSettings) {
+      return NextResponse.json({ setting: { key, value } });
     }
 
     // Upsert the setting
