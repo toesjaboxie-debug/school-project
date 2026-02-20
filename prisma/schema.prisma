@@ -20,6 +20,7 @@ model User {
   files           File[]
   grades          Grade[]
   supportMessages SupportMessage[]
+  bugReports      BugReport[]
 }
 
 model File {
@@ -28,7 +29,7 @@ model File {
   description String
   content     String   @db.Text
   fileUrl     String?
-  subject     String   // Vak: wiskunde, engels, nederlands, etc.
+  subject     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   authorId    String
@@ -37,9 +38,9 @@ model File {
 
 model Grade {
   id          String   @id @default(cuid())
-  subject     String   // Vak
-  testName    String   // Naam van de toets
-  grade       Float    // Cijfer
+  subject     String
+  testName    String
+  grade       Float
   maxGrade    Float    @default(10.0)
   date        DateTime @default(now())
   comment     String?
@@ -54,8 +55,8 @@ model Agenda {
   title       String
   description String?
   testDate    DateTime
-  subject     String   // Vak
-  type        String   @default("toets") // toets, examen, opdracht, etc.
+  subject     String
+  type        String   @default("toets")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -63,28 +64,39 @@ model Agenda {
 model SupportMessage {
   id          String   @id @default(cuid())
   message     String   @db.Text
-  type        String   @default("suggestion") // suggestie, vraag, probleem
-  status      String   @default("pending") // pending, bekeken, opgelost
+  type        String   @default("suggestie")
+  status      String   @default("pending")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Predefined subjects (vakken)
+model BugReport {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @db.Text
+  status      String   @default("open") // open, in_progress, resolved
+  priority    String   @default("medium") // low, medium, high
+  reporterName String? // For non-logged in users
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
 model Subject {
   id          String   @id @default(cuid())
-  name        String   @unique // wiskunde, engels, nederlands, etc.
-  displayName String   // Display name like "Wiskunde"
-  icon        String?  // Emoji icon
-  color       String?  // Color for UI
+  name        String   @unique
+  displayName String
+  icon        String?
+  color       String?
   createdAt   DateTime @default(now())
 }
 
-// Site settings (logo, site name, etc.)
 model SiteSettings {
   id          String   @id @default(cuid())
-  key         String   @unique // e.g., "logo", "siteName"
+  key         String   @unique
   value       String   @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

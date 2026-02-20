@@ -35,9 +35,10 @@ import {
   CheckCircle,
   AlertCircle,
   Edit,
-  Image,
   Settings,
-  Pencil
+  Pencil,
+  Bug,
+  AlertTriangle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
@@ -93,6 +94,20 @@ interface SupportMessage {
   };
 }
 
+interface BugReport {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  reporterName: string | null;
+  createdAt: string;
+  user?: {
+    id: string;
+    username: string;
+  } | null;
+}
+
 interface UserItem {
   id: string;
   username: string;
@@ -122,8 +137,8 @@ interface SiteSettings {
   siteName?: string;
 }
 
-// Default subjects as fallback
-const defaultSubjects: Subject[] = [
+// Default subjects - ALWAYS available as fallback
+const DEFAULT_SUBJECTS: Subject[] = [
   { id: '1', name: 'wiskunde', displayName: 'Wiskunde', icon: '📐', color: '#3B82F6' },
   { id: '2', name: 'engels', displayName: 'Engels', icon: '🇬🇧', color: '#10B981' },
   { id: '3', name: 'nederlands', displayName: 'Nederlands', icon: '🇳🇱', color: '#F59E0B' },
@@ -145,7 +160,7 @@ export default function Home() {
   const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
   const [activeTab, setActiveTab] = useState<'materials' | 'grades' | 'agenda' | 'support' | 'admin'>('materials');
   
-  // Site settings
+  // Site settings - with defaults
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({ logo: '/logo.svg', siteName: 'EduLearn AI' });
   
   // Auth form states
@@ -200,11 +215,19 @@ export default function Home() {
   const [newSupportMessage, setNewSupportMessage] = useState('');
   const [newSupportType, setNewSupportType] = useState('suggestie');
   
+  // Bug report states
+  const [bugReports, setBugReports] = useState<BugReport[]>([]);
+  const [bugReportDialogOpen, setBugReportDialogOpen] = useState(false);
+  const [newBugTitle, setNewBugTitle] = useState('');
+  const [newBugDescription, setNewBugDescription] = useState('');
+  const [newBugPriority, setNewBugPriority] = useState('medium');
+  const [newBugReporterName, setNewBugReporterName] = useState('');
+  
   // Admin states
   const [users, setUsers] = useState<UserItem[]>([]);
   
-  // Subject management states
-  const [subjects, setSubjects] = useState<Subject[]>(defaultSubjects);
+  // Subject management states - always use default subjects as fallback
+  const [subjects, setSubjects] = useState<Subject[]>(DEFAULT_SUBJECTS);
   const [subjectDialogOpen, setSubjectDialogOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [newSubjectName, setNewSubjectName] = useState('');
@@ -242,6 +265,7 @@ export default function Home() {
       fetchSiteSettings();
       if (user.isAdmin) {
         fetchUsers();
+        fetchBugReports();
       }
     }
   }, [user]);
@@ -269,11 +293,7 @@ export default function Home() {
       const data = await res.json();
       setFiles(data.files || []);
     } catch {
-      toast({
-        title: 'Fout',
-        description: 'Kon bestanden niet laden',
-        variant: 'destructive',
-      });
+      // Silent fail
     }
   };
 
@@ -283,11 +303,7 @@ export default function Home() {
       const data = await res.json();
       setGrades(data.grades || []);
     } catch {
-      toast({
-        title: 'Fout',
-        description: 'Kon cijfers niet laden',
-        variant: 'destructive',
-      });
+      // Silent fail
     }
   };
 
@@ -297,11 +313,7 @@ export default function Home() {
       const data = await res.json();
       setAgenda(data.agenda || []);
     } catch {
-      toast({
-        title: 'Fout',
-        description: 'Kon agenda niet laden',
-        variant: 'destructive',
-      });
+      // Silent fail
     }
   };
 
@@ -311,11 +323,17 @@ export default function Home() {
       const data = await res.json();
       setSupportMessages(data.messages || []);
     } catch {
-      toast({
-        title: 'Fout',
-        description: 'Kon berichten niet laden',
-        variant: 'destructive',
-      });
+      // Silent fail
+    }
+  };
+
+  const fetchBugReports = async () => {
+    try {
+      const res = await fetch('/api/bugs');
+      const data = await res.json();
+      setBugReports(data.bugReports || []);
+    } catch {
+      // Silent fail
     }
   };
 
@@ -325,11 +343,7 @@ export default function Home() {
       const data = await res.json();
       setUsers(data.users || []);
     } catch {
-      toast({
-        title: 'Fout',
-        description: 'Kon gebruikers niet laden',
-        variant: 'destructive',
-      });
+      // Silent fail
     }
   };
 
@@ -339,9 +353,11 @@ export default function Home() {
       const data = await res.json();
       if (data.subjects && data.subjects.length > 0) {
         setSubjects(data.subjects);
+      } else {
+        setSubjects(DEFAULT_SUBJECTS);
       }
     } catch {
-      // Use default subjects
+      setSubjects(DEFAULT_SUBJECTS);
     }
   };
 
@@ -377,10 +393,7 @@ export default function Home() {
       setUser(data.user);
       setLoginUsername('');
       setLoginPassword('');
-      toast({
-        title: 'Succes',
-        description: 'Succesvol ingelogd!',
-      });
+      toast({ title: 'Succes', description: 'Succesvol ingelogd!' });
     } catch (error) {
       toast({
         title: 'Fout',
@@ -407,10 +420,7 @@ export default function Home() {
       setUser(data.user);
       setRegisterUsername('');
       setRegisterPassword('');
-      toast({
-        title: 'Succes',
-        description: 'Account succesvol aangemaakt!',
-      });
+      toast({ title: 'Succes', description: 'Account succesvol aangemaakt!' });
     } catch (error) {
       toast({
         title: 'Fout',
@@ -430,16 +440,10 @@ export default function Home() {
       setAgenda([]);
       setSupportMessages([]);
       setUsers([]);
-      toast({
-        title: 'Succes',
-        description: 'Succesvol uitgelogd!',
-      });
+      setBugReports([]);
+      toast({ title: 'Succes', description: 'Succesvol uitgelogd!' });
     } catch {
-      toast({
-        title: 'Fout',
-        description: 'Uitloggen mislukt',
-        variant: 'destructive',
-      });
+      toast({ title: 'Fout', description: 'Uitloggen mislukt', variant: 'destructive' });
     }
   };
 
@@ -459,9 +463,7 @@ export default function Home() {
       });
       const data = await res.json();
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Uploaden mislukt');
-      }
+      if (!res.ok) throw new Error(data.error || 'Uploaden mislukt');
       
       setFiles([data.file, ...files]);
       setUploadTitle('');
@@ -470,10 +472,7 @@ export default function Home() {
       setUploadFileUrl('');
       setUploadSubject('algemeen');
       setUploadDialogOpen(false);
-      toast({
-        title: 'Succes',
-        description: 'Bestand succesvol geüpload!',
-      });
+      toast({ title: 'Succes', description: 'Bestand succesvol geüpload!' });
     } catch (error) {
       toast({
         title: 'Fout',
@@ -487,20 +486,13 @@ export default function Home() {
     if (!confirm('Weet je zeker dat je dit bestand wilt verwijderen?')) return;
     
     try {
-      const res = await fetch(`/api/files/${fileId}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
       const data = await res.json();
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Verwijderen mislukt');
-      }
+      if (!res.ok) throw new Error(data.error || 'Verwijderen mislukt');
       
       setFiles(files.filter(f => f.id !== fileId));
-      toast({
-        title: 'Succes',
-        description: 'Bestand succesvol verwijderd!',
-      });
+      toast({ title: 'Succes', description: 'Bestand succesvol verwijderd!' });
     } catch (error) {
       toast({
         title: 'Fout',
@@ -537,12 +529,10 @@ export default function Home() {
       });
       const data = await res.json();
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Chat mislukt');
-      }
+      if (!res.ok) throw new Error(data.error || 'Chat mislukt');
       
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
-    } catch (error) {
+    } catch {
       setChatMessages(prev => [...prev, { 
         role: 'assistant', 
         content: 'Sorry, er is een fout opgetreden. Probeer het opnieuw.' 
@@ -570,9 +560,7 @@ export default function Home() {
       });
       const data = await res.json();
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Cijfer toevoegen mislukt');
-      }
+      if (!res.ok) throw new Error(data.error || 'Cijfer toevoegen mislukt');
       
       setNewGradeStudentId('');
       setNewGradeSubject('');
@@ -583,10 +571,7 @@ export default function Home() {
       setNewGradeComment('');
       setAddGradeDialogOpen(false);
       fetchGrades();
-      toast({
-        title: 'Succes',
-        description: 'Cijfer succesvol toegevoegd!',
-      });
+      toast({ title: 'Succes', description: 'Cijfer succesvol toegevoegd!' });
     } catch (error) {
       toast({
         title: 'Fout',
@@ -599,9 +584,7 @@ export default function Home() {
   const handleAddAgenda = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const dateTime = newAgendaTime 
-        ? `${newAgendaDate}T${newAgendaTime}` 
-        : newAgendaDate;
+      const dateTime = newAgendaTime ? `${newAgendaDate}T${newAgendaTime}` : newAgendaDate;
 
       const res = await fetch('/api/agenda', {
         method: 'POST',
@@ -616,9 +599,7 @@ export default function Home() {
       });
       const data = await res.json();
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Agenda item toevoegen mislukt');
-      }
+      if (!res.ok) throw new Error(data.error || 'Agenda item toevoegen mislukt');
       
       setNewAgendaTitle('');
       setNewAgendaDescription('');
@@ -628,10 +609,7 @@ export default function Home() {
       setNewAgendaType('toets');
       setAddAgendaDialogOpen(false);
       fetchAgenda();
-      toast({
-        title: 'Succes',
-        description: 'Agenda item succesvol toegevoegd!',
-      });
+      toast({ title: 'Succes', description: 'Agenda item succesvol toegevoegd!' });
     } catch (error) {
       toast({
         title: 'Fout',
@@ -645,20 +623,13 @@ export default function Home() {
     if (!confirm('Weet je zeker dat je dit agenda item wilt verwijderen?')) return;
     
     try {
-      const res = await fetch(`/api/agenda?id=${id}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(`/api/agenda?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Verwijderen mislukt');
-      }
+      if (!res.ok) throw new Error(data.error || 'Verwijderen mislukt');
       
       setAgenda(agenda.filter(a => a.id !== id));
-      toast({
-        title: 'Succes',
-        description: 'Agenda item succesvol verwijderd!',
-      });
+      toast({ title: 'Succes', description: 'Agenda item succesvol verwijderd!' });
     } catch (error) {
       toast({
         title: 'Fout',
@@ -683,16 +654,11 @@ export default function Home() {
       });
       const data = await res.json();
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Bericht versturen mislukt');
-      }
+      if (!res.ok) throw new Error(data.error || 'Bericht versturen mislukt');
       
       setNewSupportMessage('');
       fetchSupportMessages();
-      toast({
-        title: 'Succes',
-        description: 'Bericht succesvol verstuurd!',
-      });
+      toast({ title: 'Succes', description: 'Bericht succesvol verstuurd!' });
     } catch (error) {
       toast({
         title: 'Fout',
@@ -711,19 +677,94 @@ export default function Home() {
       });
       const data = await res.json();
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Status bijwerken mislukt');
-      }
+      if (!res.ok) throw new Error(data.error || 'Status bijwerken mislukt');
       
       fetchSupportMessages();
-      toast({
-        title: 'Succes',
-        description: 'Status succesvol bijgewerkt!',
-      });
+      toast({ title: 'Succes', description: 'Status succesvol bijgewerkt!' });
     } catch (error) {
       toast({
         title: 'Fout',
         description: error instanceof Error ? error.message : 'Status bijwerken mislukt',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Bug report handlers
+  const handleSubmitBugReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/bugs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newBugTitle,
+          description: newBugDescription,
+          priority: newBugPriority,
+          reporterName: newBugReporterName || null,
+        }),
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Bug report versturen mislukt');
+      
+      setNewBugTitle('');
+      setNewBugDescription('');
+      setNewBugPriority('medium');
+      setNewBugReporterName('');
+      setBugReportDialogOpen(false);
+      
+      if (user?.isAdmin) {
+        fetchBugReports();
+      }
+      
+      toast({ title: 'Succes', description: 'Bug report succesvol verstuurd! Bedankt voor je feedback.' });
+    } catch (error) {
+      toast({
+        title: 'Fout',
+        description: error instanceof Error ? error.message : 'Bug report versturen mislukt',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUpdateBugStatus = async (id: string, status: string) => {
+    try {
+      const res = await fetch('/api/bugs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status }),
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Status bijwerken mislukt');
+      
+      fetchBugReports();
+      toast({ title: 'Succes', description: 'Status succesvol bijgewerkt!' });
+    } catch (error) {
+      toast({
+        title: 'Fout',
+        description: error instanceof Error ? error.message : 'Status bijwerken mislukt',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteBugReport = async (id: string) => {
+    if (!confirm('Weet je zeker dat je deze bug report wilt verwijderen?')) return;
+    
+    try {
+      const res = await fetch(`/api/bugs?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Verwijderen mislukt');
+      
+      setBugReports(bugReports.filter(b => b.id !== id));
+      toast({ title: 'Succes', description: 'Bug report succesvol verwijderd!' });
+    } catch (error) {
+      toast({
+        title: 'Fout',
+        description: error instanceof Error ? error.message : 'Verwijderen mislukt',
         variant: 'destructive',
       });
     }
@@ -751,7 +792,6 @@ export default function Home() {
     e.preventDefault();
     try {
       if (editingSubject) {
-        // Update existing subject
         const res = await fetch('/api/subjects', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -765,16 +805,10 @@ export default function Home() {
         });
         const data = await res.json();
         
-        if (!res.ok) {
-          throw new Error(data.error || 'Vak bijwerken mislukt');
-        }
+        if (!res.ok) throw new Error(data.error || 'Vak bijwerken mislukt');
         
-        toast({
-          title: 'Succes',
-          description: 'Vak succesvol bijgewerkt!',
-        });
+        toast({ title: 'Succes', description: 'Vak succesvol bijgewerkt!' });
       } else {
-        // Create new subject
         const res = await fetch('/api/subjects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -787,14 +821,9 @@ export default function Home() {
         });
         const data = await res.json();
         
-        if (!res.ok) {
-          throw new Error(data.error || 'Vak aanmaken mislukt');
-        }
+        if (!res.ok) throw new Error(data.error || 'Vak aanmaken mislukt');
         
-        toast({
-          title: 'Succes',
-          description: 'Vak succesvol toegevoegd!',
-        });
+        toast({ title: 'Succes', description: 'Vak succesvol toegevoegd!' });
       }
       
       setSubjectDialogOpen(false);
@@ -812,20 +841,13 @@ export default function Home() {
     if (!confirm('Weet je zeker dat je dit vak wilt verwijderen?')) return;
     
     try {
-      const res = await fetch(`/api/subjects?id=${id}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(`/api/subjects?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Verwijderen mislukt');
-      }
+      if (!res.ok) throw new Error(data.error || 'Verwijderen mislukt');
       
       fetchSubjects();
-      toast({
-        title: 'Succes',
-        description: 'Vak succesvol verwijderd!',
-      });
+      toast({ title: 'Succes', description: 'Vak succesvol verwijderd!' });
     } catch (error) {
       toast({
         title: 'Fout',
@@ -845,30 +867,20 @@ export default function Home() {
   const handleSaveLogo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Save logo
       if (newLogoUrl) {
-        const logoRes = await fetch('/api/settings', {
+        await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: 'logo', value: newLogoUrl }),
         });
-        
-        if (!logoRes.ok) {
-          throw new Error('Logo opslaan mislukt');
-        }
       }
       
-      // Save site name
       if (newSiteName) {
-        const nameRes = await fetch('/api/settings', {
+        await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: 'siteName', value: newSiteName }),
         });
-        
-        if (!nameRes.ok) {
-          throw new Error('Site naam opslaan mislukt');
-        }
       }
       
       setSiteSettings({
@@ -877,14 +889,11 @@ export default function Home() {
       });
       setLogoDialogOpen(false);
       
-      toast({
-        title: 'Succes',
-        description: 'Instellingen succesvol opgeslagen!',
-      });
+      toast({ title: 'Succes', description: 'Instellingen succesvol opgeslagen!' });
     } catch (error) {
       toast({
         title: 'Fout',
-        description: error instanceof Error ? error.message : 'Opslaan mislukt',
+        description: 'Opslaan mislukt',
         variant: 'destructive',
       });
     }
@@ -918,8 +927,35 @@ export default function Home() {
     }
   };
 
+  const getBugStatusBadge = (status: string) => {
+    switch (status) {
+      case 'open':
+        return <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Open</Badge>;
+      case 'in_progress':
+        return <Badge variant="default" className="gap-1 bg-yellow-500"><Clock className="h-3 w-3" />In Behandeling</Badge>;
+      case 'resolved':
+        return <Badge variant="default" className="gap-1 bg-green-600"><CheckCircle className="h-3 w-3" />Opgelost</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return <Badge variant="destructive">Hoog</Badge>;
+      case 'medium':
+        return <Badge variant="secondary">Gemiddeld</Badge>;
+      case 'low':
+        return <Badge variant="outline">Laag</Badge>;
+      default:
+        return <Badge variant="secondary">{priority}</Badge>;
+    }
+  };
+
   const getSubjectInfo = (subjectName: string) => {
-    return subjects.find(s => s.name === subjectName) || { displayName: subjectName, icon: '📚' };
+    const found = subjects.find(s => s.name === subjectName);
+    return found || { displayName: subjectName, icon: '📚' };
   };
 
   const filteredFiles = materialFilter 
@@ -933,6 +969,27 @@ export default function Home() {
   const filteredFilesForChat = chatSubject
     ? files.filter(f => f.subject === chatSubject)
     : files;
+
+  // Render safe subjects select
+  const renderSubjectsSelect = (value: string, onChange: (v: string) => void, placeholder: string, includeAll?: boolean) => {
+    const safeSubjects = subjects.length > 0 ? subjects : DEFAULT_SUBJECTS;
+    
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {includeAll && <SelectItem value="">Alle vakken</SelectItem>}
+          {safeSubjects.map((s) => (
+            <SelectItem key={s.id} value={s.name}>
+              {s.icon} {s.displayName}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  };
 
   if (loading) {
     return (
@@ -954,7 +1011,6 @@ export default function Home() {
           <div className="mb-8 text-center">
             <div className="flex items-center justify-center gap-3 mb-2">
               {siteSettings.logo && (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={siteSettings.logo} alt="Logo" className="h-10 w-10 object-contain" />
               )}
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
@@ -1045,7 +1101,75 @@ export default function Home() {
             </CardContent>
           </Card>
           
-          <p className="mt-6 text-sm text-muted-foreground text-center">
+          {/* Bug Report for non-users */}
+          <div className="mt-6">
+            <Dialog open={bugReportDialogOpen} onOpenChange={setBugReportDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Bug className="h-4 w-4 mr-2" />
+                  Meld een Bug
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Bug Melden</DialogTitle>
+                  <DialogDescription>
+                    Heb je een probleem gevonden? Laat het ons weten!
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmitBugReport} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bug-title">Titel</Label>
+                    <Input
+                      id="bug-title"
+                      placeholder="Korte beschrijving van het probleem"
+                      value={newBugTitle}
+                      onChange={(e) => setNewBugTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bug-description">Beschrijving</Label>
+                    <Textarea
+                      id="bug-description"
+                      placeholder="Beschrijf het probleem in detail..."
+                      value={newBugDescription}
+                      onChange={(e) => setNewBugDescription(e.target.value)}
+                      required
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Prioriteit</Label>
+                    <Select value={newBugPriority} onValueChange={setNewBugPriority}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Laag</SelectItem>
+                        <SelectItem value="medium">Gemiddeld</SelectItem>
+                        <SelectItem value="high">Hoog</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bug-reporter">Je naam (optioneel)</Label>
+                    <Input
+                      id="bug-reporter"
+                      placeholder="Je naam"
+                      value={newBugReporterName}
+                      onChange={(e) => setNewBugReporterName(e.target.value)}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit">Versturen</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+          
+          <p className="mt-4 text-sm text-muted-foreground text-center">
             Registreer gratis om toegang te krijgen tot alle studiematerialen
           </p>
         </div>
@@ -1064,7 +1188,6 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {siteSettings.logo && (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={siteSettings.logo} alt="Logo" className="h-8 w-8 object-contain" />
               )}
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
@@ -1083,6 +1206,64 @@ export default function Home() {
                   </Badge>
                 )}
               </div>
+              
+              {/* Bug Report Button */}
+              <Dialog open={bugReportDialogOpen} onOpenChange={setBugReportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Bug className="h-4 w-4 mr-2" />
+                    Bug Melden
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Bug Melden</DialogTitle>
+                    <DialogDescription>
+                      Heb je een probleem gevonden? Laat het ons weten!
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmitBugReport} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bug-title-logged">Titel</Label>
+                      <Input
+                        id="bug-title-logged"
+                        placeholder="Korte beschrijving van het probleem"
+                        value={newBugTitle}
+                        onChange={(e) => setNewBugTitle(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bug-description-logged">Beschrijving</Label>
+                      <Textarea
+                        id="bug-description-logged"
+                        placeholder="Beschrijf het probleem in detail..."
+                        value={newBugDescription}
+                        onChange={(e) => setNewBugDescription(e.target.value)}
+                        required
+                        className="min-h-[100px]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Prioriteit</Label>
+                      <Select value={newBugPriority} onValueChange={setNewBugPriority}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Laag</SelectItem>
+                          <SelectItem value="medium">Gemiddeld</SelectItem>
+                          <SelectItem value="high">Hoog</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit">Versturen</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+              
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Uitloggen
@@ -1112,6 +1293,10 @@ export default function Home() {
                   </Badge>
                 )}
               </div>
+              <Button variant="outline" size="sm" onClick={() => setBugReportDialogOpen(true)} className="w-full">
+                <Bug className="h-4 w-4 mr-2" />
+                Bug Melden
+              </Button>
               <Button variant="outline" size="sm" onClick={handleLogout} className="w-full">
                 <LogOut className="h-4 w-4 mr-2" />
                 Uitloggen
@@ -1185,19 +1370,7 @@ export default function Home() {
             <div className="lg:col-span-2 space-y-6">
               {/* Filter and Admin controls */}
               <div className="flex flex-wrap items-center justify-between gap-4">
-                <Select value={materialFilter} onValueChange={setMaterialFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Filter op vak" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Alle vakken</SelectItem>
-                    {subjects.map((s) => (
-                      <SelectItem key={s.id} value={s.name}>
-                        {s.icon} {s.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {renderSubjectsSelect(materialFilter, setMaterialFilter, "Filter op vak", true)}
                 
                 {user.isAdmin && (
                   <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
@@ -1227,18 +1400,7 @@ export default function Home() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="upload-subject">Vak</Label>
-                          <Select value={uploadSubject} onValueChange={setUploadSubject}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {subjects.map((s) => (
-                                <SelectItem key={s.id} value={s.name}>
-                                  {s.icon} {s.displayName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {renderSubjectsSelect(uploadSubject, setUploadSubject, "Selecteer vak")}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="upload-description">Beschrijving</Label>
@@ -1373,19 +1535,7 @@ export default function Home() {
                   <div className="space-y-2 mt-3">
                     <div className="flex items-center gap-2">
                       <Label className="text-sm text-muted-foreground w-16">Vak:</Label>
-                      <Select value={chatSubject} onValueChange={(v) => { setChatSubject(v); setChatFileId(''); setChatAgendaId(''); }}>
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Alle vakken" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Alle vakken</SelectItem>
-                          {subjects.map((s) => (
-                            <SelectItem key={s.id} value={s.name}>
-                              {s.icon} {s.displayName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {renderSubjectsSelect(chatSubject, (v) => { setChatSubject(v); setChatFileId(''); setChatAgendaId(''); }, "Alle vakken", true)}
                     </div>
                     <div className="flex items-center gap-2">
                       <Label className="text-sm text-muted-foreground w-16">Materiaal:</Label>
@@ -1523,18 +1673,7 @@ export default function Home() {
                       </div>
                       <div className="space-y-2">
                         <Label>Vak</Label>
-                        <Select value={newGradeSubject} onValueChange={setNewGradeSubject}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecteer vak" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {subjects.map((s) => (
-                              <SelectItem key={s.id} value={s.name}>
-                                {s.icon} {s.displayName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {renderSubjectsSelect(newGradeSubject, setNewGradeSubject, "Selecteer vak")}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="grade-test">Toetsnaam</Label>
@@ -1640,7 +1779,6 @@ export default function Home() {
               </Card>
             )}
 
-            {/* Average Grade */}
             {grades.length > 0 && (
               <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
                 <CardContent className="py-6">
@@ -1696,18 +1834,7 @@ export default function Home() {
                       </div>
                       <div className="space-y-2">
                         <Label>Vak</Label>
-                        <Select value={newAgendaSubject} onValueChange={setNewAgendaSubject}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecteer vak" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {subjects.map((s) => (
-                              <SelectItem key={s.id} value={s.name}>
-                                {s.icon} {s.displayName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {renderSubjectsSelect(newAgendaSubject, setNewAgendaSubject, "Selecteer vak")}
                       </div>
                       <div className="space-y-2">
                         <Label>Type</Label>
@@ -1850,7 +1977,6 @@ export default function Home() {
               Ondersteuning & Suggesties
             </h2>
 
-            {/* Send Message Form */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Bericht Sturen</CardTitle>
@@ -1892,7 +2018,6 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {/* Messages List */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">
@@ -1959,11 +2084,80 @@ export default function Home() {
               Admin Paneel
             </h2>
 
+            {/* Bug Reports */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Bug className="h-5 w-5" />
+                  Bug Reports
+                  {bugReports.filter(b => b.status === 'open').length > 0 && (
+                    <Badge variant="destructive">{bugReports.filter(b => b.status === 'open').length} Open</Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Bekijk en beheer gemelde bugs.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {bugReports.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">Geen bug reports.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {bugReports.map((bug) => (
+                      <div key={bug.id} className="border rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {getBugStatusBadge(bug.status)}
+                            {getPriorityBadge(bug.priority)}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(bug.createdAt).toLocaleString('nl-NL')}
+                          </span>
+                        </div>
+                        <h4 className="font-semibold">{bug.title}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">{bug.description}</p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Gerapporteerd door: {bug.user?.username || bug.reporterName || 'Anoniem'}
+                        </p>
+                        <div className="flex gap-2 mt-3">
+                          {bug.status === 'open' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateBugStatus(bug.id, 'in_progress')}
+                            >
+                              In Behandeling
+                            </Button>
+                          )}
+                          {bug.status === 'in_progress' && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleUpdateBugStatus(bug.id, 'resolved')}
+                            >
+                              Opgelost
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeleteBugReport(bug.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Verwijderen
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Site Settings */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Image className="h-5 w-5" />
                   Site Instellingen
                 </CardTitle>
                 <CardDescription>
@@ -1973,7 +2167,6 @@ export default function Home() {
               <CardContent>
                 <div className="flex items-center gap-4">
                   {siteSettings.logo && (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img 
                       src={siteSettings.logo} 
                       alt="Huidig Logo" 
@@ -2147,12 +2340,12 @@ export default function Home() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-100 rounded-lg">
-                      <BookOpen className="h-6 w-6 text-blue-600" />
+                    <div className="p-3 bg-red-100 rounded-lg">
+                      <Bug className="h-6 w-6 text-red-600" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{subjects.length}</p>
-                      <p className="text-sm text-muted-foreground">Vakken</p>
+                      <p className="text-2xl font-bold">{bugReports.filter(b => b.status === 'open').length}</p>
+                      <p className="text-sm text-muted-foreground">Open Bugs</p>
                     </div>
                   </div>
                 </CardContent>
@@ -2284,7 +2477,7 @@ export default function Home() {
                 value={newLogoUrl}
                 onChange={(e) => setNewLogoUrl(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">Voer een URL in naar je logo afbeelding (PNG, SVG, etc.)</p>
+              <p className="text-xs text-muted-foreground">Voer een URL in naar je logo afbeelding</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="site-name">Site Naam</Label>
@@ -2297,7 +2490,6 @@ export default function Home() {
             </div>
             {newLogoUrl && (
               <div className="flex justify-center p-4 border rounded-lg">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={newLogoUrl} alt="Logo Preview" className="h-16 w-16 object-contain" />
               </div>
             )}
