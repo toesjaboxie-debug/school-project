@@ -185,7 +185,6 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
-  const [chatSubject, setChatSubject] = useState<string>('');
   const [chatFileId, setChatFileId] = useState<string>('');
   const [chatAgendaId, setChatAgendaId] = useState<string>('');
   
@@ -240,8 +239,11 @@ export default function Home() {
   const [newLogoUrl, setNewLogoUrl] = useState('');
   const [newSiteName, setNewSiteName] = useState('');
   
-  // Material filter
-  const [materialFilter, setMaterialFilter] = useState<string>('');
+  // Material filter - use "all" instead of empty string
+  const [materialFilter, setMaterialFilter] = useState<string>('all');
+  
+  // Chat subject - use "all" instead of empty string  
+  const [chatSubject, setChatSubject] = useState<string>('all');
   
   // Mobile menu
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -958,15 +960,15 @@ export default function Home() {
     return found || { displayName: subjectName, icon: '📚' };
   };
 
-  const filteredFiles = materialFilter 
+  const filteredFiles = materialFilter && materialFilter !== 'all' 
     ? files.filter(f => f.subject === materialFilter)
     : files;
 
-  const filteredAgendaForChat = chatSubject
+  const filteredAgendaForChat = chatSubject && chatSubject !== 'all'
     ? agenda.filter(a => a.subject === chatSubject)
     : agenda;
 
-  const filteredFilesForChat = chatSubject
+  const filteredFilesForChat = chatSubject && chatSubject !== 'all'
     ? files.filter(f => f.subject === chatSubject)
     : files;
 
@@ -975,12 +977,12 @@ export default function Home() {
     const safeSubjects = subjects.length > 0 ? subjects : DEFAULT_SUBJECTS;
     
     return (
-      <Select value={value} onValueChange={onChange}>
+      <Select value={value || undefined} onValueChange={onChange}>
         <SelectTrigger>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {includeAll && <SelectItem value="">Alle vakken</SelectItem>}
+          {includeAll && <SelectItem value="all">Alle vakken</SelectItem>}
           {safeSubjects.map((s) => (
             <SelectItem key={s.id} value={s.name}>
               {s.icon} {s.displayName}
