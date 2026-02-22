@@ -1,0 +1,199 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String           @id @default(cuid())
+  username        String           @unique
+  password        String
+  email           String?
+  emailVerified   Boolean          @default(false)
+  backupCodes     String?          // JSON array of backup codes
+  isAdmin         Boolean          @default(false)
+  isPro           Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  files           File[]
+  grades          Grade[]
+  supportMessages SupportMessage[]
+  bugReports      BugReport[]
+  chatHistories   ChatHistory[]
+  keuzelessen     UserKeuzeles[]
+  userSchedules   UserSchedule[]
+  passwordResets  PasswordReset[]
+  proRequests     ProRequest[]
+}
+
+model ProRequest {
+  id        String   @id @default(cuid())
+  status    String   @default("pending") // pending, approved, rejected
+  message   String?  // User's message to admin
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model File {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  content     String   @db.Text
+  fileUrl     String?
+  subject     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model Grade {
+  id            String   @id @default(cuid())
+  subject       String
+  testName      String
+  grade         Float
+  maxGrade      Float    @default(10.0)
+  date          DateTime @default(now())
+  comment       String?
+  isStudentAdded Boolean @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  studentId     String
+  student       User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model Agenda {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  testDate    DateTime
+  subject     String
+  type        String   @default("toets")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SupportMessage {
+  id          String   @id @default(cuid())
+  message     String   @db.Text
+  type        String   @default("suggestie")
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BugReport {
+  id           String   @id @default(cuid())
+  title        String
+  description  String   @db.Text
+  status       String   @default("open")
+  priority     String   @default("medium")
+  reporterName String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Subject {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  icon        String?
+  color       String?
+  createdAt   DateTime @default(now())
+}
+
+model SiteSettings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ChatHistory {
+  id        String   @id @default(cuid())
+  subject   String?
+  model     String   @default("google/gemma-3-4b-it:free")
+  messages  String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Schedule {
+  id        String   @id @default(cuid())
+  day       String
+  period    Int
+  subject   String
+  room      String?
+  teacher   String?
+  startTime String
+  endTime   String
+  week      Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserSchedule {
+  id        String   @id @default(cuid())
+  day       String
+  period    Int
+  subject   String
+  room      String?
+  teacher   String?
+  startTime String
+  endTime   String
+  week      Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Keuzeles {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  teacher     String?
+  maxStudents Int      @default(30)
+  day         String?
+  period      String?
+  isActive    Boolean  @default(true)
+  isApproved  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  students    UserKeuzeles[]
+}
+
+model UserKeuzeles {
+  id          String   @id @default(cuid())
+  userId      String
+  keuzelesId  String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  keuzeles    Keuzeles @relation(fields: [keuzelesId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, keuzelesId])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
