@@ -217,6 +217,25 @@
   font-size: 0.9rem;
 }
 
+.twofa-section {
+  animation: fadeIn 0.2s ease;
+}
+
+.twofa-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.twofa-subtitle {
+  color: #737373;
+  font-size: 0.875rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
 @media (max-width: 480px) {
   .login-card {
     padding: 1.5rem;
