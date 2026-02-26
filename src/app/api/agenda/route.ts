@@ -16,19 +16,11 @@ export async function GET(request: NextRequest) {
     const upcoming = searchParams.get('upcoming');
 
     try {
-      // Get user with classId
-      const dbUser = await db.user.findUnique({ 
-        where: { id: user.id },
-        select: { classId: true }
-      });
-
-      // Build where clause - show user's own items OR public items for their class
+      // Build where clause - show user's own items OR all public items
       const where: any = {
         OR: [
           { userId: user.id }, // User's own items
-          ...(dbUser?.classId ? [
-            { isPublic: true, classId: dbUser.classId } // Public class items
-          ] : [])
+          { isPublic: true } // All public items (visible to everyone)
         ]
       };
 
