@@ -132,7 +132,10 @@ export default function AgendaPage() {
         }
       } else {
         setError(data.error || 'Fout bij toevoegen');
-        if (data.details) console.error(data.details);
+        if (data.details) {
+          console.error('Details:', data.details);
+          setError(data.error + ': ' + data.details);
+        }
       }
     } catch (e: any) {
       setError('Fout: ' + e.message);

@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
           weight: weight || 1.0,
           maxScore: maxScore || 10.0,
           isPublic: makePublic,
-          isApproved,
           classId: makePublic ? classId : null,
           userId: user.id
         },
@@ -108,7 +107,8 @@ export async function POST(request: NextRequest) {
       console.error('Agenda create error:', dbError);
       return NextResponse.json({ 
         error: 'Kon agenda item niet aanmaken',
-        details: dbError.message 
+        details: dbError.message,
+        code: dbError.code
       }, { status: 500 });
     }
   } catch (error: any) {
