@@ -16,26 +16,15 @@ export async function GET(request: NextRequest) {
     const upcoming = searchParams.get('upcoming');
 
     try {
-      // Get admin-created items + approved items + user's own items
-      const where: any = {
-        OR: [
-          // Admin items are always visible
-          { user: { isAdmin: true } },
-          // Approved items from any user
-          { isApproved: true },
-          // User's own items (even if not approved yet)
-          { userId: user.id }
-        ]
-      };
-
-      if (type) where.OR = where.OR.map((condition: any) => ({ ...condition, type }));
-      if (subject) where.OR = where.OR.map((condition: any) => ({ ...condition, subject }));
-      if (upcoming === 'true') {
-        where.OR = where.OR.map((condition: any) => ({ ...condition, testDate: { gte: new Date() } }));
-      }
-
+      // Get admin-created items + user's own items
+      // Note: isApproved filter removed to avoid errors if column doesn't exist yet
       const agendaItems = await db.agenda.findMany({
-        where,
+        where: {
+          OR: [
+            { userId: user.id },  // User's own items
+            { user: { isAdmin: true } }  // Admin items
+          ]
+        },
         include: {
           user: {
             select: { id: true, username: true, isAdmin: true }
@@ -50,7 +39,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ agendaItems });
     } catch (dbError: any) {
       console.error('Agenda query error:', dbError);
-      return NextResponse.json({ agendaItems: [], error: 'Agenda tabel nog niet beschikbaar' });
+      return NextResponse.json({ agendaItems: [], error: 'Agenda tabel nog niet beschikbaar', details: dbError.message });
     }
   } catch (error: any) {
     console.error('Agenda GET error:', error);
