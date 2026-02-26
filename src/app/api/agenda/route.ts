@@ -73,9 +73,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Titel, datum en vak zijn vereist' }, { status: 400 });
     }
 
-    // Admin items are auto-approved, user items need approval
-    const isApproved = user.isAdmin;
-    const makePublic = user.isAdmin && isPublic && classId;
+    // Only set classId if isPublic is true and classId is provided and not empty
+    const shouldMakePublic = user.isAdmin && isPublic && classId && classId.trim() !== '';
 
     try {
       const agendaItem = await db.agenda.create({
@@ -87,8 +86,8 @@ export async function POST(request: NextRequest) {
           type: type || 'toets',
           weight: weight || 1.0,
           maxScore: maxScore || 10.0,
-          isPublic: makePublic,
-          classId: makePublic ? classId : null,
+          isPublic: shouldMakePublic,
+          classId: shouldMakePublic ? classId : null,
           userId: user.id
         },
         include: {
