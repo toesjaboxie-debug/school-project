@@ -182,13 +182,13 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Delete a grade (admin only)
+// DELETE - Delete a grade (owner or admin)
 export async function DELETE(request: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || !user.isAdmin) {
-      return NextResponse.json({ error: 'Unauthorized - Admin only' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -196,6 +196,21 @@ export async function DELETE(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+    }
+
+    // Check if grade exists and belongs to user (or user is admin)
+    const grade = await db.grade.findUnique({
+      where: { id },
+      select: { studentId: true }
+    });
+
+    if (!grade) {
+      return NextResponse.json({ error: 'Cijfer niet gevonden' }, { status: 404 });
+    }
+
+    // Only allow delete if user owns the grade or is admin
+    if (grade.studentId !== user.id && !user.isAdmin) {
+      return NextResponse.json({ error: 'Geen toegang om dit cijfer te verwijderen' }, { status: 403 });
     }
 
     await db.grade.delete({
@@ -206,7 +221,7 @@ export async function DELETE(request: NextRequest) {
   } catch (error: any) {
     console.error('Delete grade error:', error);
     return NextResponse.json({
-      error: 'Failed to delete grade',
+      error: 'Kon cijfer niet verwijderen',
       exactError: error.message
     }, { status: 500 });
   }

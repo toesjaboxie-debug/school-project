@@ -166,6 +166,22 @@ export default function CijfersPage() {
     setAdding(false);
   };
 
+  const handleDeleteGrade = async (id: string) => {
+    if (!confirm('Weet je zeker dat je dit cijfer wilt verwijderen?')) return;
+
+    try {
+      const res = await fetch(`/api/grades?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        fetchGrades();
+      } else {
+        alert(data.error || 'Kon cijfer niet verwijderen');
+      }
+    } catch (e: any) {
+      alert('Fout: ' + e.message);
+    }
+  };
+
   const handleLogout = async () => { try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {} router.push('/login'); };
 
   const getColor = (g: number, max: number) => {
@@ -454,6 +470,7 @@ export default function CijfersPage() {
                     <th style={{ textAlign: 'center' }}>Gewicht</th>
                     <th>Datum</th>
                     <th>Toegevoegd door</th>
+                    <th style={{ textAlign: 'center' }}>Actie</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -474,6 +491,15 @@ export default function CijfersPage() {
                       </td>
                       <td>{new Date(g.date).toLocaleDateString('nl-NL')}</td>
                       <td>{g.isStudentAdded ? '👨‍🎓 Jij' : '👨‍🏫 Docent'}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button 
+                          onClick={() => handleDeleteGrade(g.id)} 
+                          className="btn btn-danger" 
+                          style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
+                        >
+                          🗑️
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
