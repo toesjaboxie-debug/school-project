@@ -212,6 +212,75 @@ export default function CijfersPage() {
     ? Object.values(subjectAverages).reduce((sum, s) => sum + s.average, 0) / Object.values(subjectAverages).length
     : 0;
 
+  // Calculate status based on grades
+  const calculateStatus = (): { status: 'goedgekeurd' | 'bespreekzone' | 'geweigerd'; color: string; reason: string } => {
+    if (grades.length === 0) return { status: 'goedgekeurd', color: '#34d399', reason: 'Nog geen cijfers' };
+    
+    // Normalize all grades to 1-10 scale
+    const normalizedGrades = grades.map(g => (g.grade / g.maxGrade) * 10);
+    
+    // Count grades below 4, fives (4.5-5.4), and fours (4.0-4.9)
+    const belowFour = normalizedGrades.filter(g => g < 4).length;
+    const fives = normalizedGrades.filter(g => g >= 4.5 && g < 5.5).length;
+    const fours = normalizedGrades.filter(g => g >= 4 && g < 4.5).length;
+    const foursAndFives = normalizedGrades.filter(g => g >= 4 && g < 5.5).length;
+    
+    // GEWEIGERD: 1 grade below 4 OR more than 3 fives (4+) OR (2 fives AND 1 four)
+    if (belowFour >= 1) {
+      return { 
+        status: 'geweigerd', 
+        color: '#f87171', 
+        reason: `${belowFour} cijfer${belowFour > 1 ? 's' : ''} onder de 4` 
+      };
+    }
+    if (fives >= 4) {
+      return { 
+        status: 'geweigerd', 
+        color: '#f87171', 
+        reason: `${fives} vijven (meer dan 3)` 
+      };
+    }
+    if (fives >= 2 && fours >= 1) {
+      return { 
+        status: 'geweigerd', 
+        color: '#f87171', 
+        reason: `${fives} vijf${fives > 1 ? 'ven' : ''} en ${fours} vier${fours > 1 ? 'en' : ''}` 
+      };
+    }
+    
+    // BESPREEKZONE: 3 fives OR 1 four OR (2 fives)
+    if (fives >= 3) {
+      return { 
+        status: 'bespreekzone', 
+        color: '#fbbf24', 
+        reason: `${fives} vijf${fives > 1 ? 'ven' : ''}` 
+      };
+    }
+    if (fours >= 1) {
+      return { 
+        status: 'bespreekzone', 
+        color: '#fbbf24', 
+        reason: `${fours} vier${fours > 1 ? 'en' : ''}` 
+      };
+    }
+    if (fives >= 2) {
+      return { 
+        status: 'bespreekzone', 
+        color: '#fbbf24', 
+        reason: `${fives} vijf${fives > 1 ? 'ven' : ''}` 
+      };
+    }
+    
+    // GOEDGEKEURD: 2 fives or less and no grades below 4
+    return { 
+      status: 'goedgekeurd', 
+      color: '#34d399', 
+      reason: fives > 0 ? `${fives} vijf${fives > 1 ? 'ven' : ''} (≤ 2)` : 'Alle cijfers voldoende' 
+    };
+  };
+
+  const statusInfo = calculateStatus();
+
   if (loading) return <div className="page-container" style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'white'}}><p>Laden...</p></div>;
   if (!user) return null;
 
@@ -281,19 +350,61 @@ export default function CijfersPage() {
           </div>
         )}
 
-        {/* Overall Average */}
+        {/* Overall Average and Status */}
         {grades.length > 0 && (
-          <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)', marginBottom: '0.25rem' }}>Gemiddeld eindcijfer</div>
-            <div style={{
-              fontSize: '3rem',
-              fontWeight: '700',
-              color: overallAverage >= 5.5 ? '#34d399' : overallAverage >= 4.5 ? '#fbbf24' : '#f87171'
-            }}>
-              {overallAverage.toFixed(2)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            {/* Average Card */}
+            <div className="card" style={{ padding: '1.5rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)', marginBottom: '0.25rem' }}>Gemiddeld eindcijfer</div>
+              <div style={{
+                fontSize: '3rem',
+                fontWeight: '700',
+                color: overallAverage >= 5.5 ? '#34d399' : overallAverage >= 4.5 ? '#fbbf24' : '#f87171'
+              }}>
+                {overallAverage.toFixed(2)}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
+                Gebaseerd op {grades.length} cijfers in {Object.keys(subjectAverages).length} vakken
+              </div>
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
-              Gebaseerd op {grades.length} cijfers in {Object.keys(subjectAverages).length} vakken (gewogen gemiddelde)
+
+            {/* Status Card */}
+            <div className="card" style={{ padding: '1.5rem', textAlign: 'center', background: `linear-gradient(135deg, ${statusInfo.color}20, ${statusInfo.color}10)`, borderLeft: `4px solid ${statusInfo.color}` }}>
+              <div style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)', marginBottom: '0.25rem' }}>📊 Status</div>
+              <div style={{
+                fontSize: '1.75rem',
+                fontWeight: '700',
+                color: statusInfo.color,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                {statusInfo.status === 'goedgekeurd' && '✅ Goedgekeurd'}
+                {statusInfo.status === 'bespreekzone' && '⚠️ Bespreekzone'}
+                {statusInfo.status === 'geweigerd' && '❌ Geweigerd'}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)', marginTop: '0.25rem' }}>
+                {statusInfo.reason}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Status Legend - always visible when there are grades */}
+        {grades.length > 0 && (
+          <div className="card" style={{ padding: '1rem 1.5rem', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+                <span style={{ color: '#f87171', fontWeight: '600' }}>❌ Geweigerd:</span>
+                <span style={{ color: 'rgba(255,255,255,0.6)' }}>1× onder 4, 4+ vijven, of 2 vijven + 1 vier</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+                <span style={{ color: '#fbbf24', fontWeight: '600' }}>⚠️ Bespreekzone:</span>
+                <span style={{ color: 'rgba(255,255,255,0.6)' }}>3 vijven, 1 vier, of 2 vijven</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+                <span style={{ color: '#34d399', fontWeight: '600' }}>✅ Goedgekeurd:</span>
+                <span style={{ color: 'rgba(255,255,255,0.6)' }}>Max 2 vijven, geen onvoldoendes</span>
+              </div>
             </div>
           </div>
         )}
