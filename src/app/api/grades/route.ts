@@ -51,16 +51,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     let { studentId, subject, testName, grade, maxGrade, weight, date, comment, agendaId } = body;
 
-    // Students can only add their own grades, admin can add for anyone
-    if (!user.isAdmin) {
-      studentId = user.id; // Force student to only add their own grades
+    // If no studentId provided, use current user's ID
+    if (!studentId) {
+      studentId = user.id;
     }
 
-    if (!studentId || !subject || !testName || grade === undefined) {
-      return NextResponse.json({
-        error: 'Missing required fields',
-        exactError: `studentId: ${!!studentId}, subject: ${!!subject}, testName: ${!!testName}, grade: ${grade}`
-      }, { status: 400 });
+    // Students can only add their own grades (override any attempt to set different studentId)
+    if (!user.isAdmin) {
+      studentId = user.id;
+    }
+
+    // Validate required fields
+    if (!subject || !subject.trim()) {
+      return NextResponse.json({ error: 'Vak is verplicht' }, { status: 400 });
+    }
+    if (!testName || !testName.trim()) {
+      return NextResponse.json({ error: 'Toets naam is verplicht' }, { status: 400 });
+    }
+    if (grade === undefined || grade === null || grade === '' || isNaN(parseFloat(grade))) {
+      return NextResponse.json({ error: 'Cijfer is verplicht' }, { status: 400 });
     }
 
     // Verify student exists
