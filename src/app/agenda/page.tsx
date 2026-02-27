@@ -25,10 +25,10 @@ interface Subject { id: string; name: string; displayName: string; }
 
 const defaultSubjects = ['Wiskunde', 'Engels', 'Nederlands', 'Geschiedenis', 'Aardrijkskunde', 'Biologie', 'Natuurkunde', 'Scheikunde', 'Frans', 'Duits', 'Economie'];
 const types = [
-  { value: 'toets', label: '📝 Toets', color: '#ef4444' },
-  { value: 'overhoring', label: '🗣️ Overhoring', color: '#f59e0b' },
-  { value: 'huiswerk', label: '📚 Huiswerk', color: '#3b82f6' },
-  { value: 'project', label: '📊 Project', color: '#8b5cf6' },
+  { value: 'toets', label: '📝 Toets', color: '#ef4444', needsGrade: true },
+  { value: 'overhoring', label: '🗣️ Overhoring', color: '#f59e0b', needsGrade: true },
+  { value: 'huiswerk', label: '📚 Huiswerk', color: '#3b82f6', needsGrade: false },
+  { value: 'project', label: '📊 Project', color: '#8b5cf6', needsGrade: true },
 ];
 
 export default function AgendaPage() {
@@ -52,6 +52,9 @@ export default function AgendaPage() {
     isPublic: false,
     classId: ''
   });
+
+  // Check if current type needs grade
+  const currentTypeNeedsGrade = types.find(t => t.value === newItem.type)?.needsGrade ?? true;
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -159,6 +162,16 @@ export default function AgendaPage() {
 
   const getTypeInfo = (type: string) => {
     return types.find(t => t.value === type) || types[0];
+  };
+
+  // Handle type change - reset weight/maxScore for homework
+  const handleTypeChange = (type: string) => {
+    const typeInfo = getTypeInfo(type);
+    if (typeInfo.needsGrade) {
+      setNewItem({ ...newItem, type, weight: 1, maxScore: 10 });
+    } else {
+      setNewItem({ ...newItem, type, weight: 0, maxScore: 0 });
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -291,13 +304,14 @@ export default function AgendaPage() {
                         {isPending && <span style={{ background: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 500 }}>⏳ Wacht op goedkeuring</span>}
                         {item.isCompleted && <span style={{ color: '#34d399', fontSize: '0.875rem' }}>✅ Afgerond</span>}
                         {item.grades.length > 0 && <span style={{ color: '#fbbf24', fontSize: '0.875rem' }}>📊 Cijfer: {item.grades[0].grade.toFixed(1)}</span>}
+                        {!getTypeInfo(item.type).needsGrade && <span style={{ color: '#60a5fa', fontSize: '0.875rem' }}>📋 Geen cijfer</span>}
                       </div>
                       <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.25rem' }}>{item.title}</h3>
                       <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)', flexWrap: 'wrap' }}>
                         <span>📖 {item.subject}</span>
                         <span>📅 {formatDate(item.testDate)}</span>
-                        {item.weight !== 1 && <span>⚡ {item.weight}x meetelt</span>}
-                        <span>📊 Max {item.maxScore}</span>
+                        {getTypeInfo(item.type).needsGrade && item.weight > 0 && <span>⚡ {item.weight}x meetelt</span>}
+                        {getTypeInfo(item.type).needsGrade && item.maxScore > 0 && <span>📊 Max {item.maxScore}</span>}
                         {!item.user.isAdmin && <span>👤 Door {item.user.username}</span>}
                       </div>
                       {item.description && (
@@ -347,8 +361,8 @@ export default function AgendaPage() {
 
               <div className="form-group">
                 <label className="form-label">Type</label>
-                <select value={newItem.type} onChange={e => setNewItem({ ...newItem, type: e.target.value })} className="input-field">
-                  {types.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                <select value={newItem.type} onChange={e => handleTypeChange(e.target.value)} className="input-field">
+                  {types.map(t => <option key={t.value} value={t.value}>{t.label}{!t.needsGrade ? ' (geen cijfer)' : ''}</option>)}
                 </select>
               </div>
 
@@ -365,16 +379,24 @@ export default function AgendaPage() {
                 <input type="date" value={newItem.testDate} onChange={e => setNewItem({ ...newItem, testDate: e.target.value })} className="input-field" required />
               </div>
 
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label className="form-label">Meetelt (x)</label>
-                  <input type="number" step="0.5" min="0.5" max="5" value={newItem.weight} onChange={e => setNewItem({ ...newItem, weight: parseFloat(e.target.value) || 1 })} className="input-field" />
+              {/* Weight and Max Score - only for types that need grades */}
+              {currentTypeNeedsGrade && (
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label">Meetelt (x)</label>
+                    <input type="number" step="0.5" min="0.5" max="5" value={newItem.weight} onChange={e => setNewItem({ ...newItem, weight: parseFloat(e.target.value) || 1 })} className="input-field" />
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label">Max Score</label>
+                    <input type="number" step="0.5" value={newItem.maxScore} onChange={e => setNewItem({ ...newItem, maxScore: parseFloat(e.target.value) || 10 })} className="input-field" />
+                  </div>
                 </div>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label className="form-label">Max Score</label>
-                  <input type="number" step="0.5" value={newItem.maxScore} onChange={e => setNewItem({ ...newItem, maxScore: parseFloat(e.target.value) || 10 })} className="input-field" />
+              )}
+              {!currentTypeNeedsGrade && (
+                <div style={{ padding: '1rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.3)', marginBottom: '1rem' }}>
+                  <p style={{ color: '#60a5fa', fontSize: '0.875rem', margin: 0 }}>💡 Huiswerk krijgt geen cijfer - het wordt niet meegerekend in je gemiddelde.</p>
                 </div>
-              </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">Beschrijving</label>
